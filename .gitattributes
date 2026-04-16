@@ -1,0 +1,44 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Source code — always LF
+*.cxx text eol=lf
+*.hxx text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.cpp text eol=lf
+*.glsl text eol=lf
+*.vert text eol=lf
+*.frag text eol=lf
+*.comp text eol=lf
+*.geom text eol=lf
+*.tesc text eol=lf
+*.tese text eol=lf
+
+# Build system
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+
+# Config / docs
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.txt text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Binary files — no diff, no merge, no line-ending conversion
+*.spv binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.hdr binary
+*.ktx binary
+*.ktx2 binary
+*.glb binary
+*.gltf text
+*.obj text

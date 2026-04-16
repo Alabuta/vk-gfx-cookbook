@@ -1,0 +1,49 @@
+# === Build directories ===
+build/
+cmake-build-*/
+out/
+
+# === CMake generated ===
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+_deps/
+
+# === Compiled binaries ===
+*.exe
+*.out
+*.app
+*.dll
+*.so
+*.dylib
+*.lib
+*.a
+*.o
+*.obj
+
+# === SPIR-V shader bytecode ===
+*.spv
+
+# === IDE / Editor ===
+.idea/
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+*.user
+*.suo
+*.ncrunchproject
+*.ncrunchsolution
+
+# === OS generated ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === Dependency artifacts ===
+vcpkg_installed/
+
+# === Compressed textures ===
+*.ktx2

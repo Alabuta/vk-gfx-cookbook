@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug)",
+      "Bash(where cmake *)",
+      "Read(//c/Program Files/CMake/bin/**)",
+      "Read(//c/Program Files \\(x86\\)/CMake/bin/**)",
+      "Bash(C:/Users/auqol/AppData/Local/Programs/CLion/bin/cmake/win/x64/bin/cmake.exe -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug)",
+      "Bash(C:/Users/auqol/AppData/Local/Programs/CLion/bin/cmake/win/x64/bin/cmake.exe -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/auqol/AppData/Local/Programs/CLion/bin/ninja/win/x64/ninja.exe '-DCMAKE_CXX_COMPILER=C:/Program Files/mingw64/bin/c++.exe')",
+      "Bash(rm -rf build)",
+      "Bash(C:/Users/auqol/AppData/Local/Programs/CLion/bin/cmake/win/x64/bin/cmake.exe -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/Users/auqol/AppData/Local/Programs/CLion/bin/ninja/win/x64/ninja.exe '-DCMAKE_CXX_COMPILER=C:/Program Files/mingw64/bin/g++.exe')",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.packtpub.com)"
+    ]
+  }
+}
