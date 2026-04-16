@@ -114,6 +114,7 @@ function(configure_cookbook_target TARGET_NAME)
 
             glm::glm
             glfw
+            Taskflow::Taskflow
     )
 
     target_link_options(${TARGET_NAME}

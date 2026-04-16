@@ -34,7 +34,17 @@ FetchContent_Declare(
         SYSTEM
 )
 
-FetchContent_MakeAvailable(glm glfw)
+# === Taskflow === (header-only, parallel task programming)
+set(TF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(TF_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+        taskflow
+        GIT_REPOSITORY git@github.com:taskflow/taskflow.git
+        GIT_TAG v4.0.0
+        SYSTEM
+)
+
+FetchContent_MakeAvailable(glm glfw taskflow)
 
 # --- Shared build configuration ---
 include(cmake/CookbookConfig.cmake)
