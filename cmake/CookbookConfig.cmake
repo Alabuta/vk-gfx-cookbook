@@ -1,39 +1,35 @@
 function(configure_cookbook_target TARGET_NAME)
 
+    # Compiler/platform dispatch via generator expressions (evaluated per-target at generation time).
+    # Using $<CXX_COMPILER_ID:...> rather than $<COMPILE_LANG_AND_ID:CXX,...> because the latter is
+    # only valid for compile properties; CXX_COMPILER_ID works in link-library and link-option contexts too.
+    set(IS_GNU_LINUX "$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Windows>>>")
+    set(IS_MINGW     "$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>")
+    set(IS_CLANG_CL  "$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>")
+    set(IS_MSVC      "$<CXX_COMPILER_ID:MSVC>")
+
     if(MSVC)
         target_compile_definitions(${TARGET_NAME} PRIVATE _CONSOLE)
     endif()
 
     set_target_properties(${TARGET_NAME}
         PROPERTIES
-            CXX_STANDARD 26
+            CXX_STANDARD 23
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
 
             POSITION_INDEPENDENT_CODE ON
 
             DEBUG_POSTFIX .d
+
+            XCODE_GENERATE_SCHEME          TRUE
+            XCODE_SCHEME_WORKING_DIRECTORY "$<$<PLATFORM_ID:Darwin>:${CMAKE_SOURCE_DIR}>"
+            VS_DEBUGGER_WORKING_DIRECTORY  "$<$<PLATFORM_ID:Windows>:${CMAKE_SOURCE_DIR}>"
     )
-
-    if(APPLE)
-        set_target_properties(${TARGET_NAME}
-            PROPERTIES
-                XCODE_GENERATE_SCHEME TRUE
-                XCODE_SCHEME_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        )
-    endif()
-
-    if(MSVC)
-        set_target_properties(${TARGET_NAME}
-            PROPERTIES
-                VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-        )
-    endif()
 
     target_compile_options(${TARGET_NAME}
         PRIVATE
-
-            "$<$<OR:$<BOOL:${CXX_FLAGS_STYLE_GNU}>,$<BOOL:${CXX_FLAGS_STYLE_CLANGCL}>,$<BOOL:${CXX_FLAGS_STYLE_MINGW_WINDOWS}>>:"
+            "$<$<OR:${IS_GNU_LINUX},${IS_CLANG_CL},${IS_MINGW}>:"
                 -Wpedantic
                 -Wall
                 -Wextra
@@ -57,7 +53,7 @@ function(configure_cookbook_target TARGET_NAME)
                 -Wno-pre-c++17-compat
             ">"
 
-            "$<$<OR:$<BOOL:${CXX_FLAGS_STYLE_GNU}>,$<BOOL:${CXX_FLAGS_STYLE_MINGW_WINDOWS}>>:"
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
                 -fconcepts
 
                 -fasynchronous-unwind-tables                # Increased reliability of backtraces
@@ -71,7 +67,7 @@ function(configure_cookbook_target TARGET_NAME)
                 -Wuseless-cast
             ">"
 
-            "$<$<BOOL:${CXX_FLAGS_STYLE_CLANGCL}>:"
+            "$<${IS_CLANG_CL}:"
                 /EHa
 
                 -Wno-unknown-pragmas
@@ -80,7 +76,7 @@ function(configure_cookbook_target TARGET_NAME)
                 -Wno-shadow-field-in-constructor
             ">"
 
-            "$<$<BOOL:${CXX_FLAGS_STYLE_MSVC}>:"
+            "$<${IS_MSVC}:"
                 # /W4
                 # /WX
                 /w14242 # 'identifier': conversion from 'type1' to 'type1', possible loss of data
@@ -107,7 +103,7 @@ function(configure_cookbook_target TARGET_NAME)
 
     target_link_libraries(${TARGET_NAME}
         PRIVATE
-            "$<$<OR:$<BOOL:${CXX_FLAGS_STYLE_GNU}>,$<BOOL:${CXX_FLAGS_STYLE_MINGW_WINDOWS}>>:"
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
                 stdc++fs
                 stdc++exp
             ">"
@@ -119,13 +115,13 @@ function(configure_cookbook_target TARGET_NAME)
 
     target_link_options(${TARGET_NAME}
         PRIVATE
-            "$<$<IN_LIST:${CMAKE_SYSTEM_NAME},Linux;Darwin>:"
+            "$<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Darwin>>:"
                 LINKER:-z,defs;                         # Detect and reject underlinking
                 LINKER:-z,now;                          # Disable lazy binding
                 LINKER:-z,relro                         # Read-only segments after relocation
             ">"
 
-            "$<$<OR:$<BOOL:${CXX_FLAGS_STYLE_GNU}>,$<BOOL:${CXX_FLAGS_STYLE_MINGW_WINDOWS}>>:"
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
                 LINKER:-no-undefined;                   # Report unresolved symbol references from regular object files
                 LINKER:-no-allow-shlib-undefined;       # Disallows undefined symbols in shared libraries
                 LINKER:-unresolved-symbols=report-all

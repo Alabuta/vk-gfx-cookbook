@@ -20,10 +20,11 @@ Hands-on implementations following **"Vulkan 3D Graphics Rendering Cookbook — 
 
 ## Prerequisites
 
-- C++26 compiler (MSVC 19.40+, GCC 14+, or Clang 18+)
+- C++23 compiler (MSVC 19.40+, GCC 14+, or Clang 18+)
 - [CMake 4.0+](https://cmake.org/download/)
 - [Ninja](https://ninja-build.org/) (recommended generator)
-- [Vulkan SDK](https://vulkan.lunarg.com/) (for later chapters)
+- [Vulkan SDK](https://vulkan.lunarg.com/) (pulled in by LightweightVK)
+- Python 3 — LightweightVK runs `deploy_deps.py` at CMake configure time to fetch its transitive third-party libraries
 - Linux only: X11 development libraries (`libx11-dev`, `libxrandr-dev`, etc.)
 
 ## Building
@@ -50,7 +51,8 @@ vk-gfx-cookbook/
         chapter02/          # (upcoming)
         ...
     cmake/
-        CookbookConfig.cmake    # Shared target configuration
+        CookbookConfig.cmake    # Shared target configuration (warnings, C++ standard, linker flags)
+        Dependencies.cmake      # Third-party FetchContent declarations
     CMakeLists.txt              # Root build file
 ```
 
@@ -66,8 +68,10 @@ All libraries are fetched automatically via CMake `FetchContent` — no manual i
 |---------|---------|---------|
 | GLFW | 3.4 | Windowing and input |
 | GLM | 1.0.2 | Mathematics |
+| Taskflow | v4.0.0 | Parallel task programming |
+| LightweightVK | 1.4.0 | Vulkan rendering abstraction (pulls VMA, Tracy, minilog, KTX-Software, and others via its own `deploy_deps.py`) |
 
-Additional dependencies will be added as chapters progress (Vulkan Memory Allocator, Assimp, ImGui, Tracy, MeshOptimizer, etc.).
+Additional dependencies will be added as chapters progress (Assimp, ImGui, MeshOptimizer, etc.).
 
 ## License
 
