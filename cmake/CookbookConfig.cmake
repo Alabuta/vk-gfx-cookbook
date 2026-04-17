@@ -54,8 +54,6 @@ function(configure_cookbook_target TARGET_NAME)
             ">"
 
             "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
-                -fconcepts
-
                 -fasynchronous-unwind-tables                # Increased reliability of backtraces
                 -fexceptions                                # Enable table-based thread cancellation
 

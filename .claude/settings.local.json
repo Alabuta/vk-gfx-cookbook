@@ -15,7 +15,20 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git ls-remote *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(curl -s https://raw.githubusercontent.com/corporateshark/lightweightvk/1.4.0/.gitmodules)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://raw.githubusercontent.com/corporateshark/lightweightvk/1.4.0/deploy_deps.py)",
+      "Bash(rm -rf build-verify)",
+      "Bash(/c/Users/auqol/AppData/Local/Programs/CLion/bin/cmake/win/x64/bin/cmake.exe -B build-verify -G Ninja -DCMAKE_BUILD_TYPE=Debug)",
+      "Read(//c/Program Files/Microsoft Visual Studio//**)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio//**)",
+      "Bash(cmd.exe /c \"call \\\\\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\2022\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\\\\\" >nul && set PATH=C:\\\\Users\\\\auqol\\\\AppData\\\\Local\\\\Programs\\\\CLion\\\\bin\\\\cmake\\\\win\\\\x64\\\\bin;C:\\\\Users\\\\auqol\\\\AppData\\\\Local\\\\Programs\\\\CLion\\\\bin\\\\ninja\\\\win\\\\x64;%PATH% && cmake -B build-verify -G Ninja -DCMAKE_BUILD_TYPE=Debug\")",
+      "Bash(cmd.exe /c \"C:\\\\Users\\\\auqol\\\\AppData\\\\Local\\\\Temp\\\\configure.bat\")",
+      "Bash(printf '@echo off\\\\r\\\\ncall \"C:\\\\\\\\Program Files\\\\\\\\Microsoft Visual Studio\\\\\\\\2022\\\\\\\\Community\\\\\\\\VC\\\\\\\\Auxiliary\\\\\\\\Build\\\\\\\\vcvars64.bat\" >nul\\\\r\\\\nset PATH=C:\\\\\\\\Users\\\\\\\\auqol\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Programs\\\\\\\\CLion\\\\\\\\bin\\\\\\\\cmake\\\\\\\\win\\\\\\\\x64\\\\\\\\bin;C:\\\\\\\\Users\\\\\\\\auqol\\\\\\\\AppData\\\\\\\\Local\\\\\\\\Programs\\\\\\\\CLion\\\\\\\\bin\\\\\\\\ninja\\\\\\\\win\\\\\\\\x64;%%PATH%%\\\\r\\\\ncd /d D:\\\\\\\\petprojects\\\\\\\\vk-gfx-cookbook\\\\r\\\\nif exist build-verify rmdir /s /q build-verify\\\\r\\\\ncmake -B build-verify -G Ninja -DCMAKE_BUILD_TYPE=Debug\\\\r\\\\necho CMAKE_EXIT=%%errorlevel%%\\\\r\\\\n' file /tmp/configure.bat cmd.exe /c \"C:\\\\Users\\\\auqol\\\\AppData\\\\Local\\\\Temp\\\\configure.bat\")",
+      "Bash(/c/Users/auqol/AppData/Local/Programs/CLion/bin/cmake/win/x64/bin/cmake.exe -B build-verify -G 'Visual Studio 17 2022' -A x64)",
+      "Bash(/c/Program Files \\(x86\\)/Microsoft Visual Studio/Installer/vswhere.exe *)",
+      "Bash(git -C /d/petprojects/vk-gfx-cookbook status --short)",
+      "Bash(cat *)"
     ]
   }
 }

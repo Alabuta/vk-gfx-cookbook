@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Implementations following **"Vulkan 3D Graphics Rendering Cookbook — Second Edition"** (Kosarevsky, Medvedev, Latypov; Packt 2025). Organized as progressive chapters teaching Vulkan concepts. Written in modern C++26. Currently in early development (chapter 1 in progress).
+Implementations following **"Vulkan 3D Graphics Rendering Cookbook — Second Edition"** (Kosarevsky, Medvedev, Latypov; Packt 2025). Organized as progressive chapters teaching Vulkan concepts. Written in modern C++23. Currently in early development (chapter 1 in progress).
 
 ### Book Chapters
 
@@ -22,7 +22,7 @@ Implementations following **"Vulkan 3D Graphics Rendering Cookbook — Second Ed
 
 ## Build System
 
-CMake 4.0+ with Ninja generator. Dependencies fetched via `FetchContent` (no manual installs needed except system-level X11 on Linux).
+CMake 3.30+ with Ninja generator. Dependencies fetched via `FetchContent` (no manual installs needed except system-level X11 on Linux).
 
 ```bash
 # Configure and build (from project root)
@@ -46,6 +46,8 @@ cmake --build build --target chapter01_glfw
 |---------|---------|--------|
 | GLFW | 3.4 | FetchContent (GitHub) |
 | GLM | 1.0.2 | FetchContent (GitHub) |
+| Taskflow | 4.0.0 | FetchContent (GitHub) |
+| LightweightVK | 1.4.0 | FetchContent (GitHub) |
 | X11 | system | Required on Linux only |
 
 ## Compiler Configuration
@@ -60,7 +62,7 @@ Platform detection uses `CXX_FLAGS_STYLE_*` variables and CMake generator expres
 ## Conventions
 
 - Source file extension: `.cxx`
-- C++ standard: C++26 (`CXX_STANDARD 26`, extensions off)
+- C++ standard: C++23 (`CXX_STANDARD 23`, extensions off)
 - Uses `std::print` (C++23 `<print>` header) instead of `iostream`
 - Debug builds get `.d` suffix on binaries
 - Target naming: `chapterNN_<topic>` (e.g., `chapter01_glfw`)

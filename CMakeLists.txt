@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 project(vk_gfx_cookbook VERSION 1.0.0 LANGUAGES CXX)
 
