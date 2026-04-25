@@ -12,6 +12,12 @@ function(configure_cookbook_target TARGET_NAME)
         target_compile_definitions(${TARGET_NAME} PRIVATE _CONSOLE)
     endif()
 
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"
+            COOKBOOK_CACHE_DIR_STRING="${CMAKE_SOURCE_DIR}/.cache/"
+    )
+
     set_target_properties(${TARGET_NAME}
         PROPERTIES
             CXX_STANDARD 23
@@ -109,6 +115,9 @@ function(configure_cookbook_target TARGET_NAME)
             glm::glm
             glfw
             Taskflow::Taskflow
+            SPIRV
+            glslang
+            glslang-default-resource-limits
     )
 
     target_link_options(${TARGET_NAME}

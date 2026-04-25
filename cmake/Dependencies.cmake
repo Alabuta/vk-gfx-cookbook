@@ -33,18 +33,22 @@ FetchContent_Declare(
         SYSTEM
 )
 
-# === LightweightVK === (Vulkan rendering library; deploys its own deps via deploy_deps.py at configure time — requires Python3)
-set(LVK_WITH_GLFW OFF CACHE BOOL "" FORCE)
-set(LVK_WITH_SAMPLES OFF CACHE BOOL "" FORCE)
-set(LVK_DEPLOY_SCREENSHOT_TESTS OFF CACHE BOOL "" FORCE)
-set(LVK_WITH_TRACY OFF CACHE BOOL "" FORCE)
-set(LVK_WITH_IMPLOT OFF CACHE BOOL "" FORCE)
+# === glslang === (GLSL to SPIR-V compiler; produces `glslang`, `SPIRV`, and `glslang-default-resource-limits` targets)
+#
+# ENABLE_OPT=OFF avoids the SPIRV-Tools dependency that glslang's optimizer pulls in; the
+# update_glslang_sources.py bootstrap step is only needed when the optimizer is on.
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
+set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
+set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
+set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
-        lvk
-        GIT_REPOSITORY https://github.com/corporateshark/lightweightvk
-        GIT_TAG 1.4.0
+        glslang
+        GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
+        GIT_TAG 16.2.0
         EXCLUDE_FROM_ALL
         SYSTEM
 )
 
-FetchContent_MakeAvailable(glm glfw taskflow lvk)
+FetchContent_MakeAvailable(glm glfw taskflow glslang)

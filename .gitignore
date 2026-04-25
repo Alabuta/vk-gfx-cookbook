@@ -25,6 +25,9 @@ _deps/
 # === SPIR-V shader bytecode ===
 *.spv
 
+# === Runtime cache (compiled SPIR-V .bin, generated artifacts) ===
+.cache/
+
 # === IDE / Editor ===
 .idea/
 .vs/

@@ -11,3 +11,4 @@ include(cmake/CookbookConfig.cmake)
 # --- Chapter sub-projects ---
 add_subdirectory(chapters/chapter01/glfw)
 add_subdirectory(chapters/chapter01/taskflow)
+add_subdirectory(chapters/chapter01/glslang)

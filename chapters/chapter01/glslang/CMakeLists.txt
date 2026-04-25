@@ -1,0 +1,2 @@
+add_executable(chapter01_glslang src/main.cxx)
+configure_cookbook_target(chapter01_glslang)

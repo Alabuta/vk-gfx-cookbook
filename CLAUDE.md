@@ -36,6 +36,8 @@ cmake --build build --target chapter01_glfw
 ## Architecture
 
 - `chapters/chapterNN/<topic>/` — each chapter exercise is a self-contained CMake sub-project with its own `CMakeLists.txt` and `src/main.cxx`
+- `shaders/chapterNN/<topic>/` — GLSL sources consumed by chapter targets at runtime; located via the `COOKBOOK_SHADER_DIR_STRING` compile define injected by `configure_cookbook_target()`
+- `.cache/` — runtime output for compiled SPIR-V and other generated artifacts; located via `COOKBOOK_CACHE_DIR_STRING` and gitignored
 - `cmake/CookbookConfig.cmake` — shared `configure_cookbook_target()` function applied to all chapter targets
 - Root `CMakeLists.txt` — project-wide settings, dependency declarations, compiler detection, and chapter subdirectory includes
 - Chapter CMakeLists files are minimal; they define the executable target and source, then call `configure_cookbook_target()`
@@ -47,7 +49,8 @@ cmake --build build --target chapter01_glfw
 | GLFW | 3.4 | FetchContent (GitHub) |
 | GLM | 1.0.2 | FetchContent (GitHub) |
 | Taskflow | 4.0.0 | FetchContent (GitHub) |
-| LightweightVK | 1.4.0 | FetchContent (GitHub) |
+| glslang | 16.2.0 | FetchContent (GitHub) — `ENABLE_OPT=OFF` to skip the SPIRV-Tools bootstrap |
+| LightweightVK | 1.4.0 | FetchContent (GitHub) — temporarily disabled while glslang is wired up directly |
 | X11 | system | Required on Linux only |
 
 ## Compiler Configuration

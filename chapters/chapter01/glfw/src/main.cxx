@@ -22,7 +22,7 @@ int main()
     glfwSetErrorCallback(
         [](int error, const char* description)
         {
-            std::println("GLFW Error ({0}): {1}", error, description);
+            std::println("GLFW Error ({:#06x}): {}", error, description);
         });
 
     if (const auto result = glfwInit(); result != GLFW_TRUE)
