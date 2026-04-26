@@ -20,8 +20,11 @@ InsertBraces: false
 ColumnLimit: 120
 
 # Alignment
+# Type-centric: pointer/reference bind to the type (`T* p`, `T& r`), not the declarator.
 PointerAlignment: Left
 ReferenceAlignment: Left
+DerivePointerAlignment: false
+QualifierAlignment: Right
 AlignAfterOpenBracket: Align
 AlignOperands: Align
 LambdaBodyIndentation: OuterScope

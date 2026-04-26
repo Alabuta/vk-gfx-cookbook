@@ -1,9 +1,10 @@
 ﻿#include <cstdint>
 #include <memory>
+#include <algorithm>
 #include <print>
-#include <string>
 #include <string_view>
 #include <system_error>
+#include <ranges>
 #include <vector>
 #include <array>
 #include <span>
@@ -14,17 +15,17 @@
 #include "glslang/Include/glslang_c_interface.h"
 #include "glslang/Public/resource_limits_c.h"
 
-constexpr std::string_view kCOOKBOOK_SHADER_DIR_STRING = COOKBOOK_SHADER_DIR_STRING;
-constexpr std::string_view kCOOKBOOK_CACHE_DIR_STRING = COOKBOOK_CACHE_DIR_STRING;
+constexpr std::string_view kShaderDir = COOKBOOK_SHADER_DIR_STRING;
+constexpr std::string_view kCacheDir = COOKBOOK_CACHE_DIR_STRING;
 
 
 void compile_glsl_shader(
-    const std::string_view shader_file_path,
-    const glslang_stage_t shader_stage,
-    const char* source_code,
+    std::string_view const shader_file_path,
+    glslang_stage_t const shader_stage,
+    char const* source_code,
     std::vector<uint32_t>& out_spirv_words)
 {
-    const glslang_input_t glslang_input{
+    glslang_input_t const glslang_input{
         .language = GLSLANG_SOURCE_GLSL,
         .stage = shader_stage,
 
@@ -47,7 +48,7 @@ void compile_glsl_shader(
     };
 
     // Dismissible Scope Guard
-    const std::unique_ptr<glslang_shader_t, decltype(&glslang_shader_delete)> shader{
+    std::unique_ptr<glslang_shader_t, decltype(&glslang_shader_delete)> const shader{
         glslang_shader_create(&glslang_input),
         glslang_shader_delete};
 
@@ -76,22 +77,35 @@ void compile_glsl_shader(
     }
 
     // Dismissible Scope Guard
-    const std::unique_ptr<glslang_program_t, decltype(&glslang_program_delete)> program{
+    std::unique_ptr<glslang_program_t, decltype(&glslang_program_delete)> const program{
         glslang_program_create(),
-        glslang_program_delete
-    };
+        glslang_program_delete};
 
     glslang_program_add_shader(program.get(), shader.get());
 
     if (!glslang_program_link(program.get(), GLSLANG_MSG_SPV_RULES_BIT | GLSLANG_MSG_VULKAN_RULES_BIT))
     {
         std::println("GLSL linking failed {}", shader_file_path);
-        std::println("{}", glslang_shader_get_info_log(shader.get()));
-        std::println("{}", glslang_shader_get_info_debug_log(shader.get()));
+        std::println("{}", glslang_program_get_info_log(program.get()));
+        std::println("{}", glslang_program_get_info_debug_log(program.get()));
         return;
     }
 
-    glslang_program_SPIRV_generate(program.get(), shader_stage);
+    {
+        glslang_spv_options_t options = {
+            .generate_debug_info = true,
+            .strip_debug_info = false,
+            .disable_optimizer = false,
+            .optimize_size = true,
+            .disassemble = false,
+            .validate = true,
+            .emit_nonsemantic_shader_debug_info = false,
+            .emit_nonsemantic_shader_debug_source = false,
+            .compile_only = false,
+            .optimize_allow_expanded_id_bound = false
+        };
+        glslang_program_SPIRV_generate_with_options(program.get(), shader_stage, &options);
+    }
 
     // Number of words in SPIR-V binary
     auto const words_count = glslang_program_SPIRV_get_size(program.get());
@@ -99,7 +113,7 @@ void compile_glsl_shader(
 
     glslang_program_SPIRV_get(program.get(), out_spirv_words.data());
 
-    if (const char* spirv_messages = glslang_program_SPIRV_get_messages(program.get());
+    if (char const* spirv_messages = glslang_program_SPIRV_get_messages(program.get());
         spirv_messages != nullptr && spirv_messages[0] != '\0')
     {
         std::println("({}) {}", shader_file_path, spirv_messages);
@@ -108,11 +122,11 @@ void compile_glsl_shader(
     std::println("[{}] is successfully done", shader_file_path);
 }
 
-std::vector<char> read_text_file(const std::string_view file_name)
+std::vector<char> read_text_file(std::string_view const file_name)
 {
     namespace fs = std::filesystem;
 
-    const fs::path path = fs::path{kCOOKBOOK_SHADER_DIR_STRING} / file_name;
+    fs::path const path = fs::path{kShaderDir} / file_name;
     std::ifstream file{path, std::ios::in | std::ios::binary};
 
     if (file.fail())
@@ -133,7 +147,7 @@ std::vector<char> read_text_file(const std::string_view file_name)
     }
 
     std::vector<std::ifstream::char_type> chars(static_cast<std::size_t>(chars_count) + 1, '\0');
-    file.read(std::data(chars), chars_count);
+    file.read(chars.data(), chars_count);
 
     if (file.fail())
     {
@@ -141,19 +155,19 @@ std::vector<char> read_text_file(const std::string_view file_name)
     }
 
     if (constexpr std::array<std::ifstream::char_type, 3> utf8_bom{'\357', '\273', '\277'};
-        std::equal(std::begin(utf8_bom), std::end(utf8_bom), std::begin(chars)))
+        std::ranges::equal(chars | std::views::take(3), utf8_bom))
     {
-        std::fill_n(std::begin(chars), 3, ' ');
+        std::fill_n(chars.begin(), 3, ' ');
     }
 
     return chars;
 }
 
-void save_spirv_byte_code(const std::string_view file_name, const std::span<const std::byte> byte_code)
+void save_spirv_byte_code(std::string_view const file_name, std::span<std::byte const> const byte_code)
 {
     namespace fs = std::filesystem;
 
-    const fs::path path = fs::path{kCOOKBOOK_CACHE_DIR_STRING} / file_name;
+    fs::path const path = fs::path{kCacheDir} / file_name;
     std::ofstream file{path, std::ios::binary};
 
     if (file.fail())
@@ -162,16 +176,16 @@ void save_spirv_byte_code(const std::string_view file_name, const std::span<cons
     }
 
     file.write(
-        reinterpret_cast<const std::ostream::char_type*>(std::data(byte_code)),
-        static_cast<std::streamsize>(std::size(byte_code)));
+        reinterpret_cast<std::ostream::char_type const*>(byte_code.data()),
+        static_cast<std::streamsize>(byte_code.size()));
 }
 
 void compile_and_save_shader(
-    const glslang_stage_t shader_stage,
-    const std::string_view src_file_path,
-    const std::string_view dst_file_path)
+    glslang_stage_t const shader_stage,
+    std::string_view const src_file_path,
+    std::string_view const dst_file_path)
 {
-    const std::vector<char> source_code = read_text_file(src_file_path);
+    std::vector<char> const source_code = read_text_file(src_file_path);
     if (source_code.empty())
     {
         return;
@@ -194,9 +208,9 @@ int main()
     }
 
     namespace fs = std::filesystem;
-    if (std::error_code ec; !fs::create_directories(kCOOKBOOK_CACHE_DIR_STRING, ec) && ec)
+    if (std::error_code ec; !fs::create_directories(kCacheDir, ec) && ec)
     {
-        std::println("Failed to create cache directory {}: {}", kCOOKBOOK_CACHE_DIR_STRING, ec.message());
+        std::println("Failed to create cache directory {}: {}", kCacheDir, ec.message());
         glslang_finalize_process();
         return 1;
     }
