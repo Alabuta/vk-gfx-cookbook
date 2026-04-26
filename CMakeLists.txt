@@ -9,6 +9,6 @@ include(cmake/Dependencies.cmake)
 include(cmake/CookbookConfig.cmake)
 
 # --- Chapter sub-projects ---
-add_subdirectory(chapters/chapter01/glfw)
-add_subdirectory(chapters/chapter01/taskflow)
-add_subdirectory(chapters/chapter01/glslang)
+add_subdirectory(src/chapter01/glfw)
+add_subdirectory(src/chapter01/taskflow)
+add_subdirectory(src/chapter01/glslang)

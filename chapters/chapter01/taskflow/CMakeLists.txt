@@ -1,2 +1,0 @@
-add_executable(chapter01_taskflow src/main.cxx)
-configure_cookbook_target(chapter01_taskflow)
