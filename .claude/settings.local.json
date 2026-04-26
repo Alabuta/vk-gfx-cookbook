@@ -28,7 +28,20 @@
       "Bash(/c/Users/auqol/AppData/Local/Programs/CLion/bin/cmake/win/x64/bin/cmake.exe -B build-verify -G 'Visual Studio 17 2022' -A x64)",
       "Bash(/c/Program Files \\(x86\\)/Microsoft Visual Studio/Installer/vswhere.exe *)",
       "Bash(git -C /d/petprojects/vk-gfx-cookbook status --short)",
-      "Bash(cat *)"
+      "Bash(cat *)",
+      "Bash(gh api *)",
+      "Bash(where clang-tidy *)",
+      "Bash(clang-tidy --version)",
+      "Read(//c/Program Files/LLVM/bin/**)",
+      "Bash(where clang *)",
+      "Read(//c/msys64/ucrt64/bin/**)",
+      "Read(//c/msys64/mingw64/bin/**)",
+      "Bash(where clang-format *)",
+      "Bash(/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin/clang-format.exe *)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin/clang-format.exe\" --dry-run --Werror chapters/chapter01/glfw/src/main.cxx)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/VC/Tools/Llvm/x64/bin/clang-format.exe\" -i chapters/chapter01/glfw/src/main.cxx)",
+      "Bash(where cmake.exe)",
+      "Bash(cmake -B cmake-build-release -G Ninja -DCMAKE_BUILD_TYPE=Release)"
     ]
   }
 }
