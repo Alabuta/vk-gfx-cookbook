@@ -8,14 +8,9 @@ function(configure_cookbook_target TARGET_NAME)
     set(IS_CLANG_CL  "$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>")
     set(IS_MSVC      "$<CXX_COMPILER_ID:MSVC>")
 
-    if(MSVC)
-        target_compile_definitions(${TARGET_NAME} PRIVATE _CONSOLE)
-    endif()
-
-    target_compile_definitions(${TARGET_NAME}
+    target_include_directories(${TARGET_NAME}
         PRIVATE
-            COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"
-            COOKBOOK_CACHE_DIR_STRING="${CMAKE_SOURCE_DIR}/.cache/"
+            ${CMAKE_SOURCE_DIR}/include
     )
 
     set_target_properties(${TARGET_NAME}
@@ -31,6 +26,30 @@ function(configure_cookbook_target TARGET_NAME)
             XCODE_GENERATE_SCHEME          TRUE
             XCODE_SCHEME_WORKING_DIRECTORY "$<$<PLATFORM_ID:Darwin>:${CMAKE_SOURCE_DIR}>"
             VS_DEBUGGER_WORKING_DIRECTORY  "$<$<PLATFORM_ID:Windows>:${CMAKE_SOURCE_DIR}>"
+    )
+
+    target_compile_definitions(${TARGET_NAME}
+        PRIVATE
+            $<$<CONFIG:Debug>:VULKAN_DEBUG>
+
+            # To avoid symbolic conflicts between 'volk.h' and 'vulkan/vulkan.h'
+            VK_NO_PROTOTYPES
+
+            # volk required platform specific defines
+            "$<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>"
+            "$<$<PLATFORM_ID:Linux>:"
+                VK_USE_PLATFORM_XLIB_KHR
+                VK_USE_PLATFORM_XCB_KHR
+                VK_USE_PLATFORM_WAYLAND_KHR
+            ">"
+            "$<$<PLATFORM_ID:Darwin>:"
+                VK_USE_PLATFORM_MACOS_MVK
+                VK_USE_PLATFORM_IOS_MVK
+                VK_USE_PLATFORM_METAL_EXT
+            ">"
+
+            COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"
+            COOKBOOK_CACHE_DIR_STRING="${CMAKE_SOURCE_DIR}/.cache/"
     )
 
     target_compile_options(${TARGET_NAME}
@@ -112,9 +131,14 @@ function(configure_cookbook_target TARGET_NAME)
                 stdc++exp
             ">"
 
+            Vulkan::Vulkan
+
+            volk::volk
+
             glm::glm
             glfw
             Taskflow::Taskflow
+
             SPIRV
             glslang
             glslang-default-resource-limits

@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 project(vk_gfx_cookbook VERSION 1.0.0 LANGUAGES CXX)
 
+configure_file(
+    "${CMAKE_SOURCE_DIR}/include/config.hxx.in"
+    "${CMAKE_SOURCE_DIR}/include/config.hxx"
+)
+
 # --- Third-party dependencies ---
 include(cmake/Dependencies.cmake)
 

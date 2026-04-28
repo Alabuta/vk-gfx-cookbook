@@ -1,5 +1,15 @@
 include(FetchContent)
 
+find_package(Vulkan 1.4 REQUIRED)
+
+# === volk === (header-only)
+FetchContent_Declare(
+        volk
+        GIT_REPOSITORY https://github.com/zeux/volk.git
+        GIT_TAG        1.4.304
+        SYSTEM
+)
+
 # === GLM === (header-only)
 FetchContent_Declare(
         glm
@@ -34,7 +44,6 @@ FetchContent_Declare(
 )
 
 # === glslang === (GLSL to SPIR-V compiler; produces `glslang`, `SPIRV`, and `glslang-default-resource-limits` targets)
-#
 # ENABLE_OPT=OFF avoids the SPIRV-Tools dependency that glslang's optimizer pulls in; the
 # update_glslang_sources.py bootstrap step is only needed when the optimizer is on.
 set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
@@ -51,4 +60,4 @@ FetchContent_Declare(
         SYSTEM
 )
 
-FetchContent_MakeAvailable(glm glfw taskflow glslang)
+FetchContent_MakeAvailable(volk glm glfw taskflow glslang)
