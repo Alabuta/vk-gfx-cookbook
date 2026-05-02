@@ -13,6 +13,19 @@ function(configure_cookbook_target TARGET_NAME)
             ${CMAKE_SOURCE_DIR}/include
     )
 
+    target_sources(${TARGET_NAME}
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/modules/cookbook.bootstrap.cxx
+            ${CMAKE_SOURCE_DIR}/modules/cookbook.window.cxx
+
+        PRIVATE
+            FILE_SET cookbook_modules TYPE CXX_MODULES
+                BASE_DIRS ${CMAKE_SOURCE_DIR}/modules
+                FILES
+                    ${CMAKE_SOURCE_DIR}/modules/cookbook.bootstrap.cxxm
+                    ${CMAKE_SOURCE_DIR}/modules/cookbook.window.cxxm
+    )
+
     set_target_properties(${TARGET_NAME}
         PROPERTIES
             CXX_STANDARD 23
@@ -35,17 +48,28 @@ function(configure_cookbook_target TARGET_NAME)
             # To avoid symbolic conflicts between 'volk.h' and 'vulkan/vulkan.h'
             VK_NO_PROTOTYPES
 
-            # volk required platform specific defines
-            "$<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>"
+            # volk and GLFW3-native required platform specific defines
+            "$<$<PLATFORM_ID:Windows>:"
+                VK_USE_PLATFORM_WIN32_KHR
+
+                GLFW_EXPOSE_NATIVE_WIN32
+                GLFW_EXPOSE_NATIVE_WGL
+            ">"
+
             "$<$<PLATFORM_ID:Linux>:"
                 VK_USE_PLATFORM_XLIB_KHR
                 VK_USE_PLATFORM_XCB_KHR
                 VK_USE_PLATFORM_WAYLAND_KHR
+
+                GLFW_EXPOSE_NATIVE_X11
             ">"
+
             "$<$<PLATFORM_ID:Darwin>:"
                 VK_USE_PLATFORM_MACOS_MVK
                 VK_USE_PLATFORM_IOS_MVK
                 VK_USE_PLATFORM_METAL_EXT
+
+                GLFW_EXPOSE_NATIVE_COCOA
             ">"
 
             COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"

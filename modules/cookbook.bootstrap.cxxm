@@ -1,0 +1,12 @@
+module;
+
+#include <functional>
+
+export module cookbook.bootstrap;
+
+export namespace cookbook
+{
+    bool bootstrap_app();
+    void tick_app(std::function<void()>&& callback);
+    void terminate_app();
+}
