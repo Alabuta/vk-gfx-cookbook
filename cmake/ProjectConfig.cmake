@@ -10,20 +10,49 @@ function(configure_cookbook_target TARGET_NAME)
 
     target_include_directories(${TARGET_NAME}
         PRIVATE
-            ${CMAKE_SOURCE_DIR}/include
+            ${CMAKE_SOURCE_DIR}/src
     )
 
     target_sources(${TARGET_NAME}
         PRIVATE
-            ${CMAKE_SOURCE_DIR}/modules/cookbook.bootstrap.cxx
-            ${CMAKE_SOURCE_DIR}/modules/cookbook.window.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/app/bootstrap.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/app/window.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance_device_factory.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/surface.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxx
 
         PRIVATE
             FILE_SET cookbook_modules TYPE CXX_MODULES
-                BASE_DIRS ${CMAKE_SOURCE_DIR}/modules
+                BASE_DIRS ${CMAKE_SOURCE_DIR}/src/common
                 FILES
-                    ${CMAKE_SOURCE_DIR}/modules/cookbook.bootstrap.cxxm
-                    ${CMAKE_SOURCE_DIR}/modules/cookbook.window.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/app/bootstrap.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/app/window.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/helpers.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/surface.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxxm
+    )
+
+    target_link_libraries(${TARGET_NAME}
+        PRIVATE
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
+                stdc++fs
+                stdc++exp
+            ">"
+
+            #Vulkan::Headers
+            volk::volk
+
+            GPUOpen::VulkanMemoryAllocator
+
+            glm::glm
+            glfw
+            Taskflow::Taskflow
+
+            SPIRV
+            glslang
+            glslang-default-resource-limits
     )
 
     set_target_properties(${TARGET_NAME}
@@ -48,36 +77,33 @@ function(configure_cookbook_target TARGET_NAME)
             # To avoid symbolic conflicts between 'volk.h' and 'vulkan/vulkan.h'
             VK_NO_PROTOTYPES
 
+            # Makes the GLFW header not include any OpenGL or OpenGL ES API header
+            GLFW_INCLUDE_NONE
+
             # volk and GLFW3-native required platform specific defines
-            "$<$<PLATFORM_ID:Windows>:"
-                VK_USE_PLATFORM_WIN32_KHR
-
-                GLFW_EXPOSE_NATIVE_WIN32
-                GLFW_EXPOSE_NATIVE_WGL
-            ">"
-
             "$<$<PLATFORM_ID:Linux>:"
-                VK_USE_PLATFORM_XLIB_KHR
-                VK_USE_PLATFORM_XCB_KHR
                 VK_USE_PLATFORM_WAYLAND_KHR
-
-                GLFW_EXPOSE_NATIVE_X11
             ">"
 
             "$<$<PLATFORM_ID:Darwin>:"
                 VK_USE_PLATFORM_MACOS_MVK
-                VK_USE_PLATFORM_IOS_MVK
-                VK_USE_PLATFORM_METAL_EXT
+            ">"
 
-                GLFW_EXPOSE_NATIVE_COCOA
+            "$<$<PLATFORM_ID:Windows>:"
+                VK_USE_PLATFORM_WIN32_KHR
+
+                GLFW_EXPOSE_NATIVE_WIN32
+                GLFW_NATIVE_INCLUDE_NONE
             ">"
 
             COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"
             COOKBOOK_CACHE_DIR_STRING="${CMAKE_SOURCE_DIR}/.cache/"
+            COOKBOOK_LOADER_SETTINGS_FILE_STRING="${CMAKE_SOURCE_DIR}/vk_loader_settings.json"
     )
 
     target_compile_options(${TARGET_NAME}
         PRIVATE
+
             "$<$<OR:${IS_GNU_LINUX},${IS_CLANG_CL},${IS_MINGW}>:"
                 -Wpedantic
                 -Wall
@@ -146,26 +172,6 @@ function(configure_cookbook_target TARGET_NAME)
                 /w14906 # string literal cast to 'LPWSTR'
                 /w14928 # illegal copy-initialization; more than one user-defined conversion has been implicitly applied
             ">"
-    )
-
-    target_link_libraries(${TARGET_NAME}
-        PRIVATE
-            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
-                stdc++fs
-                stdc++exp
-            ">"
-
-            Vulkan::Vulkan
-
-            volk::volk
-
-            glm::glm
-            glfw
-            Taskflow::Taskflow
-
-            SPIRV
-            glslang
-            glslang-default-resource-limits
     )
 
     target_link_options(${TARGET_NAME}

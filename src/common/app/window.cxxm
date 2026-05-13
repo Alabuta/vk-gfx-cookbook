@@ -2,7 +2,7 @@ module;
 
 #include <string>
 
-#define GLFW_INCLUDE_NONE
+#include <volk.h>
 #include <GLFW/glfw3.h>
 
 export module cookbook.window;
@@ -13,7 +13,7 @@ export namespace cookbook
     {
     public:
 
-        window(std::string const& title, int width, int height) noexcept;
+        window(std::string const& title, uint32_t width, uint32_t height) noexcept;
         ~window();
 
         window(window const&) = delete;
@@ -26,6 +26,8 @@ export namespace cookbook
         [[nodiscard]] GLFWwindow* handle() const noexcept;
 
         [[nodiscard]] bool should_close() const noexcept;
+
+        [[nodiscard]] VkSurfaceKHR create_vulkan_surface(VkInstance instance) const noexcept;
 
     private:
 

@@ -1,0 +1,47 @@
+module;
+
+#include <string>
+#include <vector>
+
+#include <volk.h>
+
+export module cookbook.vulkan_instance;
+
+import cookbook.window;
+import cookbook.vulkan_surface;
+import cookbook.vulkan_device;
+
+export namespace cookbook
+{
+    struct vulkan_instance_info
+    {
+        std::vector<std::string> extensions{};
+        std::vector<std::string> validation_layers{};
+        bool enable_validation{false};
+    };
+
+    class vulkan_instance final
+    {
+    public:
+
+        explicit vulkan_instance(vulkan_instance_info const& info) noexcept;
+        ~vulkan_instance();
+
+        vulkan_instance(vulkan_instance const&) = delete;
+        vulkan_instance(vulkan_instance&&) = delete;
+
+        vulkan_instance& operator=(vulkan_instance const&) = delete;
+        vulkan_instance& operator=(vulkan_instance&&) = delete;
+
+        [[nodiscard]] explicit operator bool() const noexcept;
+        [[nodiscard]] VkInstance handle() const noexcept;
+
+        [[nodiscard]] vulkan_surface create_surface(window const& w) noexcept;
+        [[nodiscard]] vulkan_device create_device(vulkan_device_info const& info) noexcept;
+
+    private:
+
+        VkInstance handle_{VK_NULL_HANDLE};
+        VkDebugUtilsMessengerEXT debug_utils_messenger_{VK_NULL_HANDLE};
+    };
+}

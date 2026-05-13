@@ -1,0 +1,135 @@
+module;
+
+#include <cstdint>
+#include <limits>
+#include <print>
+
+#include <volk.h>
+
+#include "vulkan_format.hxx"
+
+module cookbook.vulkan_device;
+
+namespace cookbook
+{
+    vulkan_device::vulkan_device(
+        VkPhysicalDevice physical_device,
+        VkDevice handle,
+        vulkan_queue_families queue_families) noexcept
+        : physical_device_{physical_device},
+          handle_{handle},
+          queue_families_{queue_families}
+    {
+        vkGetPhysicalDeviceProperties2(physical_device_, &device_properties_);
+        vkGetPhysicalDeviceMemoryProperties2(physical_device_, &memory_properties_);
+
+        auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
+
+        vkGetDeviceQueue(handle_, queue_families_.main, 0, &main_queue_);
+
+        if (queue_families_.dedicated_compute != invalid_family_index)
+        {
+            vkGetDeviceQueue(handle_, queue_families_.dedicated_compute, 0, &dedicated_compute_queue_);
+        }
+
+        if (queue_families_.dedicated_transfer != invalid_family_index)
+        {
+            vkGetDeviceQueue(handle_, queue_families_.dedicated_transfer, 0, &dedicated_transfer_queue_);
+        }
+
+        std::println("[Vulkan] : Log : physical device name is {}", device_properties_.properties.deviceName);
+        std::println("[Vulkan] : Log : main queue family index is {}", queue_families_.main);
+
+        if (queue_families_.dedicated_compute != invalid_family_index)
+        {
+            std::println(
+                "[Vulkan] : Log : dedicated async compute queue family index is {}",
+                queue_families_.dedicated_compute);
+        }
+        else
+        {
+            std::println("[Vulkan] : Log : no dedicated async compute queue; main queue must be used for compute");
+        }
+
+        if (queue_families_.dedicated_transfer != invalid_family_index)
+        {
+            std::println(
+                "[Vulkan] : Log : dedicated DMA transfer queue family index is {}",
+                queue_families_.dedicated_transfer);
+        }
+        else
+        {
+            std::println("[Vulkan] : Log : no dedicated DMA transfer queue; main queue must be used for transfer");
+        }
+    }
+
+    vulkan_device::~vulkan_device()
+    {
+        if (handle_ == VK_NULL_HANDLE)
+        {
+            return;
+        }
+
+        if (auto const result = vkDeviceWaitIdle(handle_); result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Warning : an error encountered on 'vkDeviceWaitIdle' call ({})", result);
+        }
+
+        vkDestroyDevice(handle_, nullptr);
+    }
+
+    vulkan_device::operator bool() const noexcept
+    {
+        return physical_device_ != VK_NULL_HANDLE && handle_ != VK_NULL_HANDLE;
+    }
+
+    VkPhysicalDevice vulkan_device::physical_device() const noexcept
+    {
+        return physical_device_;
+    }
+
+    VkDevice vulkan_device::handle() const noexcept
+    {
+        return handle_;
+    }
+
+    VkPhysicalDeviceProperties const& vulkan_device::properties() const noexcept
+    {
+        return device_properties_.properties;
+    }
+
+    VkPhysicalDeviceMemoryProperties const& vulkan_device::memory_properties() const noexcept
+    {
+        return memory_properties_.memoryProperties;
+    }
+
+    std::uint32_t vulkan_device::main_queue_family_index() const noexcept
+    {
+        return queue_families_.main;
+    }
+
+    std::uint32_t vulkan_device::dedicated_compute_queue_family_index() const noexcept
+    {
+        return queue_families_.dedicated_compute;
+    }
+
+    std::uint32_t vulkan_device::dedicated_transfer_queue_family_index() const noexcept
+    {
+        return queue_families_.dedicated_transfer;
+    }
+
+    VkQueue vulkan_device::main_queue() const noexcept
+    {
+        return main_queue_;
+    }
+
+    VkQueue vulkan_device::dedicated_compute_queue() const noexcept
+    {
+        return dedicated_compute_queue_;
+    }
+
+    VkQueue vulkan_device::dedicated_transfer_queue() const noexcept
+    {
+        return dedicated_transfer_queue_;
+    }
+}

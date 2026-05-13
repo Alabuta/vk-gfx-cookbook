@@ -1,0 +1,85 @@
+module;
+
+#include <cstdint>
+#include <limits>
+#include <vector>
+#include <string>
+
+#include <volk.h>
+
+export module cookbook.vulkan_device;
+
+export namespace cookbook
+{
+    struct vulkan_device_info
+    {
+        VkSurfaceKHR surface{VK_NULL_HANDLE};
+        std::vector<std::string> extensions{};
+    };
+
+    struct vulkan_queue_families
+    {
+        std::uint32_t main{std::numeric_limits<std::uint32_t>::max()};
+        std::uint32_t dedicated_compute{std::numeric_limits<std::uint32_t>::max()};
+        std::uint32_t dedicated_transfer{std::numeric_limits<std::uint32_t>::max()};
+    };
+
+    class vulkan_device final
+    {
+    public:
+
+        vulkan_device() noexcept = default;
+
+        vulkan_device(
+            VkPhysicalDevice physical_device,
+            VkDevice handle,
+            vulkan_queue_families queue_families) noexcept;
+
+        ~vulkan_device();
+
+        vulkan_device(vulkan_device const&) = delete;
+        vulkan_device(vulkan_device&&) = delete;
+
+        vulkan_device& operator=(vulkan_device const&) = delete;
+        vulkan_device& operator=(vulkan_device&&) = delete;
+
+        [[nodiscard]] explicit operator bool() const noexcept;
+
+        [[nodiscard]] VkPhysicalDevice physical_device() const noexcept;
+        [[nodiscard]] VkDevice handle() const noexcept;
+
+        [[nodiscard]] VkPhysicalDeviceProperties const& properties() const noexcept;
+        [[nodiscard]] VkPhysicalDeviceMemoryProperties const& memory_properties() const noexcept;
+
+        [[nodiscard]] std::uint32_t main_queue_family_index() const noexcept;
+        [[nodiscard]] std::uint32_t dedicated_compute_queue_family_index() const noexcept;
+        [[nodiscard]] std::uint32_t dedicated_transfer_queue_family_index() const noexcept;
+
+        [[nodiscard]] VkQueue main_queue() const noexcept;
+        [[nodiscard]] VkQueue dedicated_compute_queue() const noexcept;
+        [[nodiscard]] VkQueue dedicated_transfer_queue() const noexcept;
+
+    private:
+
+        VkPhysicalDevice physical_device_{VK_NULL_HANDLE};
+        VkDevice handle_{VK_NULL_HANDLE};
+
+        vulkan_queue_families queue_families_{};
+
+        VkPhysicalDeviceProperties2 device_properties_{
+            .sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2},
+            .pNext{nullptr},
+            .properties{}
+        };
+
+        VkPhysicalDeviceMemoryProperties2 memory_properties_{
+            .sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2},
+            .pNext{nullptr},
+            .memoryProperties{}
+        };
+
+        VkQueue main_queue_{VK_NULL_HANDLE};
+        VkQueue dedicated_compute_queue_{VK_NULL_HANDLE};
+        VkQueue dedicated_transfer_queue_{VK_NULL_HANDLE};
+    };
+}

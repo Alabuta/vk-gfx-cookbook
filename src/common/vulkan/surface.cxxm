@@ -1,0 +1,30 @@
+module;
+
+#include <volk.h>
+
+export module cookbook.vulkan_surface;
+
+export namespace cookbook
+{
+    class vulkan_surface final
+    {
+    public:
+
+        vulkan_surface(VkInstance instance, VkSurfaceKHR handle) noexcept;
+        ~vulkan_surface();
+
+        vulkan_surface(vulkan_surface const&) = delete;
+        vulkan_surface(vulkan_surface&&) = delete;
+
+        vulkan_surface& operator=(vulkan_surface const&) = delete;
+        vulkan_surface& operator=(vulkan_surface&&) = delete;
+
+        [[nodiscard]] explicit operator bool() const noexcept;
+        [[nodiscard]] VkSurfaceKHR handle() const noexcept;
+
+    private:
+
+        VkInstance instance_{VK_NULL_HANDLE};
+        VkSurfaceKHR handle_{VK_NULL_HANDLE};
+    };
+}

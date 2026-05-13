@@ -1,13 +1,15 @@
 include(FetchContent)
 
-find_package(Vulkan 1.4 REQUIRED)
+find_package(Vulkan ${COOKBOOK_VULKAN_API_VERSION_MAJOR}.${COOKBOOK_VULKAN_API_VERSION_MINOR} REQUIRED)
 
 # === volk === (header-only)
 FetchContent_Declare(
         volk
         GIT_REPOSITORY https://github.com/zeux/volk.git
         GIT_TAG        1.4.304
+        EXCLUDE_FROM_ALL
         SYSTEM
+        FIND_PACKAGE_ARGS
 )
 
 # === GLM === (header-only)
@@ -17,6 +19,7 @@ FetchContent_Declare(
         GIT_TAG 1.0.2
         EXCLUDE_FROM_ALL
         SYSTEM
+        FIND_PACKAGE_ARGS
 )
 
 # === GLFW ===
@@ -30,6 +33,7 @@ FetchContent_Declare(
         GIT_TAG 3.4
         EXCLUDE_FROM_ALL
         SYSTEM
+        FIND_PACKAGE_ARGS
 )
 
 # === Taskflow === (header-only, parallel task programming)
@@ -41,6 +45,7 @@ FetchContent_Declare(
         GIT_TAG v4.0.0
         EXCLUDE_FROM_ALL
         SYSTEM
+        FIND_PACKAGE_ARGS
 )
 
 # === glslang === (GLSL to SPIR-V compiler; produces `glslang`, `SPIRV`, and `glslang-default-resource-limits` targets)
@@ -58,6 +63,17 @@ FetchContent_Declare(
         GIT_TAG 16.2.0
         EXCLUDE_FROM_ALL
         SYSTEM
+        FIND_PACKAGE_ARGS
 )
 
-FetchContent_MakeAvailable(volk glm glfw taskflow glslang)
+# === VulkanMemoryAllocator === (header-only; exposes `GPUOpen::VulkanMemoryAllocator`)
+FetchContent_Declare(
+        VulkanMemoryAllocator
+        GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+        GIT_TAG        v3.3.0
+        EXCLUDE_FROM_ALL
+        SYSTEM
+        FIND_PACKAGE_ARGS
+)
+
+FetchContent_MakeAvailable(volk glm glfw taskflow glslang VulkanMemoryAllocator)

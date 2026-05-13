@@ -1,23 +1,26 @@
 module;
 
 #include <print>
+#include <string>
 
-#define GLFW_INCLUDE_NONE
+#include <volk.h>
 #include <GLFW/glfw3.h>
+
+#include "vulkan_format.hxx"
 
 module cookbook.window;
 
 namespace cookbook
 {
-    window::window(std::string const& title, int const width, int const height) noexcept
+    window::window(std::string const& title, uint32_t const width, uint32_t const height) noexcept
     {
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
-        handle_ = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
+        handle_ = glfwCreateWindow(static_cast<int>(width), static_cast<int>(height), title.c_str(), nullptr, nullptr);
         if (handle_ == nullptr)
         {
-            std::println("GLFW window creation failed");
+            std::println(stderr, "[GLFW] : Fatal : failed to create window");
             return;
         }
 
@@ -30,6 +33,8 @@ namespace cookbook
                     glfwSetWindowShouldClose(w, GLFW_TRUE);
                 }
             });
+
+        glfwSetWindowUserPointer(handle_, this);
     }
 
     window::~window()
@@ -37,6 +42,7 @@ namespace cookbook
         if (handle_ != nullptr)
         {
             glfwDestroyWindow(handle_);
+            handle_ = nullptr;
         }
     }
 
@@ -53,5 +59,19 @@ namespace cookbook
     bool window::should_close() const noexcept
     {
         return handle_ == nullptr || glfwWindowShouldClose(handle_) == GLFW_TRUE;
+    }
+
+    VkSurfaceKHR window::create_vulkan_surface(VkInstance instance) const noexcept
+    {
+        VkSurfaceKHR surface{VK_NULL_HANDLE};
+
+        if (auto const result = glfwCreateWindowSurface(instance, handle_, nullptr, &surface);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[GLFW] : Fatal : failed to create Vulkan window surface ({})", result);
+            return VK_NULL_HANDLE;
+        }
+
+        return surface;
     }
 }

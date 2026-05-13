@@ -1,0 +1,2 @@
+add_executable(chapter02_swapchain main.cxx)
+configure_cookbook_target(chapter02_swapchain)

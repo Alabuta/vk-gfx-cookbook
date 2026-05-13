@@ -52,7 +52,7 @@ vcpkg_installed/
 *.ktx2
 
 # === Generated headers ===
-include/config.hxx
+src/config.hxx
 
 # === Claude Code local settings ===
 .claude/settings.local.json

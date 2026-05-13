@@ -1,0 +1,93 @@
+module;
+
+#include <utility>
+#include <tuple>
+
+#include <volk.h>
+
+export module cookbook.vulkan_helpers;
+
+export namespace cookbook
+{
+    template <typename T>
+    concept ChainableVkStructure = requires(T& t, void* p)
+    {
+        { t.sType } -> std::convertible_to<VkStructureType>;
+        t.pNext = p;
+    };
+
+    template <ChainableVkStructure... Ts>
+    struct [[nodiscard]] vulkan_extending_structs_chain
+    {
+        static std::size_t constexpr Size = sizeof...(Ts);
+        static_assert(Size > 0);
+
+        using Tuple = std::tuple<Ts...>;
+
+        explicit vulkan_extending_structs_chain(Ts... args) noexcept
+            : structs_{std::move(args)...}
+        {
+            chain();
+        }
+
+        vulkan_extending_structs_chain(vulkan_extending_structs_chain const& other) noexcept
+            : structs_{other.structs_}
+        {
+            chain();
+        }
+
+        vulkan_extending_structs_chain& operator=(vulkan_extending_structs_chain const& other) noexcept
+        {
+            structs_ = other.structs_;
+            chain();
+            return *this;
+        }
+
+        // Vulkan structs are standard-layout POD types, a move is identical to a copy at the machine level
+        vulkan_extending_structs_chain(vulkan_extending_structs_chain&&) = delete;
+        vulkan_extending_structs_chain& operator=(vulkan_extending_structs_chain&&) = delete;
+
+        [[nodiscard]]
+        auto const* as_pointer() const noexcept
+        {
+            return &get<0>();
+        }
+
+        [[nodiscard]]
+        auto* as_pointer() noexcept
+        {
+            return &get<0>();
+        }
+
+        template <std::size_t I>
+        [[nodiscard]]
+        auto get() const noexcept -> std::tuple_element_t<I, Tuple> const&
+        {
+            return std::get<I>(structs_);
+        }
+
+        template <std::size_t I>
+        [[nodiscard]]
+        auto get() noexcept -> std::tuple_element_t<I, Tuple>&
+        {
+            return std::get<I>(structs_);
+        }
+
+    private:
+
+        void chain() noexcept
+        {
+            if constexpr (Size > 1)
+            {
+                [this]<std::size_t... I>(std::index_sequence<I...>)
+                {
+                    ((std::get<I>(structs_).pNext = &std::get<I + 1>(structs_)), ...);
+                }(std::make_index_sequence<Size - 1>{});
+            }
+
+            std::get<Size - 1>(structs_).pNext = nullptr;
+        }
+
+        Tuple structs_;
+    };
+}
