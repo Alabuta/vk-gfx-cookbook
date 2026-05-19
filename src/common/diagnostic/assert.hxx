@@ -2,20 +2,87 @@
 
 // General-purpose assert / verify / ensure macros.
 //
-// Macros forward to `vkgc::assert_detail::fatal_log` /
-// `vkgc::assert_detail::ensure_log_once`, which are exported by the
-// `vkgc.diagnostic` module — imported below.
+// Macros:
+//   VKGC_CHECK(expr)               // truthiness check; abort on failure
+//   VKGC_CHECKF(expr, fmt, ...)    // same + std::format message
+//   VKGC_VERIFY(expr)              // alias for CHECK
+//   VKGC_VERIFYF(expr, fmt, ...)   // alias for CHECKF
+//   VKGC_ENSURE(expr)              // log-once on failure; returns bool
+//   VKGC_ENSUREF(expr, fmt, ...)   // same + std::format message
+//   VKGC_DEBUG_BREAK()             // platform breakpoint trap
+//   VKGC_BREAK_AND_FAIL()          // debug-break then std::abort()
 //
-// Include this header at file scope of a non-module TU, or inside the
-// purview of a module unit. Do NOT include from a module's global module
-// fragment (the embedded `import` declaration is not allowed there).
+// Compile-time gates (set in cmake/ProjectConfig.cmake):
+//   VKGC_DO_CHECK   = 1  ->  CHECK/CHECKF/VERIFY/VERIFYF active; 0 strips them
+//   VKGC_DO_ENSURE  = 1  ->  ENSURE/ENSUREF active; 0 reduces them to bool cast
+//
+// Header-only: `fatal_log` / `ensure_log` are inline below; no companion
+// module. A module would force consumers to juggle the [module.import]/9
+// contiguity rule — all `import`s must form one block right after the
+// `module X;` declaration, and the stdlib `#include`s this header pulls
+// in would break that block.
+//
+// Include this header anywhere at file scope of a non-module TU, or from
+// the global module fragment of a module unit. The macros and helpers
+// have no external prerequisites beyond what's `#include`d below.
 
 #include <atomic>
+#include <cstdio>
 #include <cstdlib>
 #include <format>
+#include <print>
 #include <source_location>
+#include <string>
+#include <string_view>
 
-import vkgc.diagnostic;
+namespace vkgc::assert_detail
+{
+    namespace detail
+    {
+        inline void emit(
+            std::string_view const severity,
+            std::string_view const log_category,
+            std::string_view const expression,
+            std::string_view const message,
+            std::source_location const location) noexcept
+        {
+            std::string out = std::format(
+                "[{}] : {} : {}:{} ({}) : `{}`",
+                log_category,
+                severity,
+                location.file_name(),
+                location.line(),
+                location.function_name(),
+                expression);
+
+            if (!message.empty())
+            {
+                out = std::format("{} -- {}", out, message);
+            }
+
+            std::println(stderr, "{}", out);
+            std::fflush(stderr);
+        }
+    }
+
+    inline void fatal_log(
+        std::string_view const log_category,
+        std::string_view const expression,
+        std::string_view const message,
+        std::source_location const location) noexcept
+    {
+        detail::emit("Fatal", log_category, expression, message, location);
+    }
+
+    inline void ensure_log(
+        std::string_view const log_category,
+        std::string_view const expression,
+        std::string_view const message,
+        std::source_location const location) noexcept
+    {
+        detail::emit("Ensure", log_category, expression, message, location);
+    }
+}
 
 #if defined(__cpp_lib_debugging)
     import <debugging>;

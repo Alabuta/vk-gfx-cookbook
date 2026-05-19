@@ -2,6 +2,8 @@ module;
 
 #include <volk.h>
 
+#include "vulkan/assert.hxx"
+
 module vkgc.vulkan_surface;
 
 namespace vkgc
@@ -13,11 +15,13 @@ namespace vkgc
 
     vulkan_surface::~vulkan_surface()
     {
-        if (instance_ != VK_NULL_HANDLE && handle_ != VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(instance_) || !VKGC_ENSURE_VKHANDLE(handle_))
         {
-            vkDestroySurfaceKHR(instance_, handle_, nullptr);
-            handle_ = VK_NULL_HANDLE;
+            return;
         }
+
+        vkDestroySurfaceKHR(instance_, handle_, nullptr);
+        handle_ = VK_NULL_HANDLE;
     }
 
     vulkan_surface::operator bool() const noexcept

@@ -2,20 +2,22 @@ module;
 
 #include <algorithm>
 #include <cstdint>
+#include <expected>
 #include <limits>
-#include <optional>
 #include <print>
 #include <span>
 #include <vector>
 
 #include <volk.h>
+#include "vulkan/format.hxx"
 
 module vkgc.vulkan_presenter;
 
-import vkgc.vulkan_format;
 import vkgc.vulkan_device;
 import vkgc.vulkan_handle;
 import vkgc.vulkan_object_registry;
+
+#include "vulkan/assert.hxx"
 
 namespace vkgc
 {
@@ -28,13 +30,13 @@ namespace vkgc
           object_registry_{object_registry}
     {
         create_swapchain(info, VK_NULL_HANDLE);
-        if (swapchain_handle_ == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(swapchain_handle_))
         {
             return;
         }
 
         query_swapchain_images();
-        if (images_.empty())
+        if (!VKGC_ENSURE(!images_.empty()))
         {
             vkDestroySwapchainKHR(device_.handle(), swapchain_handle_, nullptr);
             swapchain_handle_ = VK_NULL_HANDLE;
@@ -44,7 +46,7 @@ namespace vkgc
         image_format_ = info.surface_format.format;
         extent_ = info.extent;
 
-        if (!create_image_acquired_semaphores(frames_in_flight))
+        if (!VKGC_ENSURE(create_image_acquired_semaphores(frames_in_flight)))
         {
             destroy_image_acquired_semaphores();
 
@@ -58,18 +60,12 @@ namespace vkgc
     vulkan_presenter::~vulkan_presenter()
     {
         VkDevice device_handle = device_.handle();
-        if (device_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(device_handle))
         {
             return;
         }
 
-        if (auto const result = vkDeviceWaitIdle(device_handle); result != VK_SUCCESS)
-        {
-            std::println(
-                stderr,
-                "[Vulkan] : Warning : ~vulkan_presenter encountered an error on 'vkDeviceWaitIdle' ({})",
-                result);
-        }
+        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_handle));
 
         destroy_image_acquired_semaphores();
 
@@ -110,7 +106,7 @@ namespace vkgc
         return extent_;
     }
 
-    std::optional<swapchain_image_acquire_result> vulkan_presenter::acquire_image(std::uint32_t const frame_index)
+    std::expected<swapchain_image_acquire_result, present_status> vulkan_presenter::acquire_image(std::uint32_t const frame_index)
     {
         VkSemaphore image_acquired = object_registry_.resolve_handle(image_acquired_semaphores_[frame_index]);
 
@@ -125,7 +121,7 @@ namespace vkgc
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
-            return std::nullopt;
+            return std::unexpected{present_status::out_of_date};
         }
 
         if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -134,7 +130,7 @@ namespace vkgc
                 stderr,
                 "[Vulkan] : Error : vulkan_presenter::acquire_image failed ({})",
                 result);
-            return std::nullopt;
+            return std::unexpected{present_status::error};
         }
 
         return swapchain_image_acquire_result{
@@ -156,7 +152,7 @@ namespace vkgc
             .pResults{nullptr}
         };
 
-        switch (vkQueuePresentKHR(queue, &info))
+        switch (auto const result = vkQueuePresentKHR(queue, &info); result)
         {
         case VK_SUCCESS:
             return present_status::ok;
@@ -168,10 +164,6 @@ namespace vkgc
             return present_status::out_of_date;
 
         default:
-            std::println(
-                stderr,
-                "[Vulkan] : Error : vulkan_presenter::present failed ({})",
-                vkQueuePresentKHR(queue, &info));
             return present_status::error;
         }
     }
@@ -179,20 +171,14 @@ namespace vkgc
     void vulkan_presenter::recreate(vulkan_swapchain_info const& info)
     {
         VkDevice device_handle = device_.handle();
-        if (device_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(device_handle))
         {
             return;
         }
 
-        if (auto const result = vkDeviceWaitIdle(device_handle); result != VK_SUCCESS)
-        {
-            std::println(
-                stderr,
-                "[Vulkan] : Warning : vulkan_presenter::recreate encountered an error on 'vkDeviceWaitIdle' ({})",
-                result);
-        }
+        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_handle));
 
-        VkSwapchainKHR previous = swapchain_handle_;
+        VkSwapchainKHR previous{swapchain_handle_};
         swapchain_handle_ = VK_NULL_HANDLE;
         images_.clear();
 
@@ -242,7 +228,7 @@ namespace vkgc
         if (auto const result = vkCreateSwapchainKHR(device_.handle(), &create_info, nullptr, &new_handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create swapchain ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create swapchain ({})", result);
             return;
         }
 
@@ -257,7 +243,7 @@ namespace vkgc
         if (auto const result = vkGetSwapchainImagesKHR(device_handle, swapchain_handle_, &count, nullptr);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to query swapchain image count ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to query swapchain image count ({})", result);
             return;
         }
 
@@ -266,7 +252,7 @@ namespace vkgc
         if (auto const result = vkGetSwapchainImagesKHR(device_handle, swapchain_handle_, &count, images_.data());
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to query swapchain images ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to query swapchain images ({})", result);
             images_.clear();
         }
     }

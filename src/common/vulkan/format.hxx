@@ -1,18 +1,27 @@
-module;
+#pragma once
+
+/*
+ * `std::formatter` specializations for Vulkan enums. Header-only — include
+ * where you need `std::format(VkResult)` /
+ * `std::format(VkDebugReportObjectTypeEXT)`, or before any TU that uses
+ * the VKGC_*_VKSUCCESS macros from `vulkan/assert.hxx` (the macros and
+ * the inline helpers they call depend on this formatter).
+
+ * Safe to include from a module unit's global module fragment: the
+ * specializations are pure templates with no module-attached entities.
+ * Conventional pairing in a module implementation:
+
+ * module;
+ * #include <volk.h>
+ * #include "vulkan/format.hxx"
+ * #include "vulkan/assert.hxx"   // optional, brings the VKGC macros
+ * module vkgc.foo;
+   ...
+ */
 
 #include <format>
 
 #include <volk.h>
-
-export module vkgc.vulkan_format;
-
-// `std::formatter` specializations for Vulkan enums.
-//
-// Specializations live in the module purview (no `export` keyword). The
-// reachability rule in [temp.spec]/4 says an explicit specialization must
-// be declared in every TU that triggers its instantiation; importing this
-// module satisfies that requirement, even though the specializations
-// themselves aren't named in importer-visible scope.
 
 template <>
 struct std::formatter<VkDebugReportObjectTypeEXT>

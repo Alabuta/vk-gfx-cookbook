@@ -10,11 +10,13 @@ module;
 
 #include <volk.h>
 
+#include "assert.hxx"
+#include "vulkan/format.hxx"
+
 #include "config.hxx"
 
 module vkgc.vulkan_instance;
 
-import vkgc.vulkan_format;
 
 namespace
 {
@@ -111,11 +113,7 @@ namespace vkgc
     {
         {
             std::uint32_t supported_api_version = 0;
-            if (auto const result = vkEnumerateInstanceVersion(&supported_api_version); result != VK_SUCCESS)
-            {
-                std::println(stderr, "[Vulkan] : Fatal : failed to retrieve Vulkan API version ({})", result);
-                return;
-            }
+            VKGC_VERIFY_VKSUCCESS(vkEnumerateInstanceVersion(&supported_api_version));
 
             if (supported_api_version < kVulkanApiVersion)
             {
@@ -185,25 +183,18 @@ namespace vkgc
             .ppEnabledExtensionNames{extensions.data()}
         };
 
-        if (auto const result = vkCreateInstance(&create_info, nullptr, &handle_); result != VK_SUCCESS)
-        {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create instance ({})", result);
-            handle_ = VK_NULL_HANDLE;
-            return;
-        }
+        VKGC_VERIFY_VKSUCCESS(vkCreateInstance(&create_info, nullptr, &handle_));
 
         volkLoadInstance(handle_);
 
         if (info.enable_validation)
         {
-            if (auto const result = vkCreateDebugUtilsMessengerEXT(
+            if (!VKGC_ENSURE_VKSUCCESS(vkCreateDebugUtilsMessengerEXT(
                     handle_,
                     &kDebugUtilsMessengerCreateInfo,
                     nullptr,
-                    &debug_utils_messenger_);
-                result != VK_SUCCESS)
+                    &debug_utils_messenger_)))
             {
-                std::println(stderr, "[Vulkan] : Fatal : debug utils messenger create request failed ({})", result);
                 debug_utils_messenger_ = VK_NULL_HANDLE;
             }
         }
@@ -211,7 +202,7 @@ namespace vkgc
 
     vulkan_instance::~vulkan_instance()
     {
-        if (handle_ == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(handle_))
         {
             return;
         }

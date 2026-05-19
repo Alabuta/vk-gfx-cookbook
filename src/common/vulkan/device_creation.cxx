@@ -11,15 +11,16 @@ module;
 #include <vector>
 
 #include <volk.h>
+#include "vulkan/format.hxx"
 
 #define VMA_IMPLEMENTATION
+#include "assert.hxx"
 #include "vk_mem_alloc.h"
 
 #include "GLFW/glfw3.h"
 
 module vkgc.vulkan_instance;
 
-import vkgc.vulkan_format;
 import vkgc.vulkan_device_features;
 
 namespace
@@ -34,25 +35,21 @@ namespace
         std::vector<char const*> extensions_to_check)
     {
         std::uint32_t extensions_count{0};
-        if (auto const result = vkEnumerateDeviceExtensionProperties(
+        if (!VKGC_ENSURE_VKSUCCESS(vkEnumerateDeviceExtensionProperties(
                 physical_device,
                 nullptr,
-                &extensions_count, nullptr);
-            result != VK_SUCCESS)
+                &extensions_count, nullptr)))
         {
-            std::println(stderr, "[Vulkan] : Warning : failed to retrieve device extensions count ({})", result);
             return false;
         }
 
         std::vector<VkExtensionProperties> supported_extensions(extensions_count);
-        if (auto const result = vkEnumerateDeviceExtensionProperties(
+        if (!VKGC_ENSURE_VKSUCCESS(vkEnumerateDeviceExtensionProperties(
                 physical_device,
                 nullptr,
                 &extensions_count,
-                supported_extensions.data());
-            result != VK_SUCCESS)
+                supported_extensions.data())))
         {
-            std::println(stderr, "[Vulkan] : Warning : failed to retrieve device extensions ({})", result);
             return false;
         }
 
@@ -259,27 +256,19 @@ namespace
         auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
 
         std::uint32_t physical_device_count{0};
-        if (auto const result = vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr);
-            result != VK_SUCCESS)
+        if (!VKGC_ENSURE_VKSUCCESS(vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr)))
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to enumerate physical devices ({})", result);
             return {VK_NULL_HANDLE, vkgc::vulkan_queue_families{}};
         }
 
-        if (physical_device_count == 0)
-        {
-            std::println(stderr, "[Vulkan] : Fatal : no Vulkan-capable physical devices found");
-            return {VK_NULL_HANDLE, vkgc::vulkan_queue_families{}};
-        }
+        VKGC_CHECKF(physical_device_count > 0, "no Vulkan-capable physical devices found");
 
         std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
-        if (auto const result = vkEnumeratePhysicalDevices(
+        if (!VKGC_ENSURE_VKSUCCESS(vkEnumeratePhysicalDevices(
                 instance,
                 &physical_device_count,
-                physical_devices.data());
-            result != VK_SUCCESS)
+                physical_devices.data())))
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to enumerate physical devices ({})", result);
             return {VK_NULL_HANDLE, vkgc::vulkan_queue_families{}};
         }
 
@@ -374,18 +363,16 @@ namespace vkgc
 {
     vulkan_device vulkan_instance::create_device(vulkan_device_info const& info) noexcept
     {
-        if (handle_ == VK_NULL_HANDLE)
+        if (!VKGC_ENSUREF_VKHANDLE(handle_, "cannot create device from null instance"))
         {
-            std::println(stderr, "[Vulkan] : Fatal : cannot create device from null instance");
             return {};
         }
 
         auto const extensions = build_device_extensions(info.extensions);
 
         auto [physical_device, queue_families] = select_physical_device(handle_, info.surface, extensions);
-        if (physical_device == VK_NULL_HANDLE)
+        if (!VKGC_ENSUREF_VKHANDLE(physical_device, "failed to pick physical device"))
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to pick physical device");
             return {};
         }
 
@@ -408,10 +395,8 @@ namespace vkgc
         };
 
         VkDevice device_handle{VK_NULL_HANDLE};
-        if (auto const result = vkCreateDevice(physical_device, &create_info, nullptr, &device_handle);
-            result != VK_SUCCESS)
+        if (!VKGC_ENSURE_VKSUCCESS(vkCreateDevice(physical_device, &create_info, nullptr, &device_handle)))
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create logical device ({})", result);
             return {};
         }
 

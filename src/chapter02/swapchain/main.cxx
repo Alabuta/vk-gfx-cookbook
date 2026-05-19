@@ -12,11 +12,11 @@
 #include <vk_mem_alloc.h>
 
 #include "volk.h"
-
-#include "vulkan/assert.hxx"
 #include "GLFW/glfw3.h"
 
-import vkgc.vulkan_format;
+#include "vulkan/format.hxx"
+#include "vulkan/assert.hxx"
+
 import vkgc.bootstrap;
 import vkgc.window;
 import vkgc.vulkan_instance;
@@ -496,15 +496,30 @@ bool run_app()
         }
 
         std::uint32_t const frame_index = frame_ring.begin_frame();
-
-        auto const acquired_opt = presenter.acquire_image(frame_index);
-        if (!acquired_opt)
+        if (frame_index == std::numeric_limits<std::uint32_t>::max())
         {
-            // recreate swapchain
             return false;
         }
 
-        auto const [image_acquired_semaphore, swapchain_image_index] = acquired_opt.value();
+        auto const acquired = presenter.acquire_image(frame_index);
+        if (!acquired.has_value())
+        {
+            if (!VKGC_ENSUREF(
+                acquired.error() != vkgc::present_status::out_of_date,
+                "vulkan surface no longer compatible with the swapchain - recreate swapchain"))
+            {
+                return false;
+            }
+
+            if (!VKGC_ENSUREF(
+                acquired.error() != vkgc::present_status::error,
+                "unexpected error occurred while acquiring the swapchain"))
+            {
+                return false;
+            }
+        }
+
+        auto const [image_acquired_semaphore, swapchain_image_index] = acquired.value();
 
         auto const command_buffer = vk_object_registry.resolve_handle(command_buffers[frame_index]);
         if (command_buffer == VK_NULL_HANDLE)
@@ -678,14 +693,7 @@ bool run_app()
 
             VKGC_VERIFYF_VKSUCCESS(
                 vkQueueSubmit(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence),
-                "frame-in-flight index #{}", frame_index);
-
-            /*if (auto const result = vkQueueSubmit(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence);
-                result != VK_SUCCESS)
-            {
-                std::println(stderr, "[Vulkan] : Error : failed to submit command buffer");
-                return false;
-            }*/
+                "failed to submit command buffer for #{} frame-in-flight", frame_index);
         }
 
         frame_ring.end_frame();
@@ -697,6 +705,7 @@ bool run_app()
 
         case vkgc::present_status::suboptimal:
         case vkgc::present_status::out_of_date:
+            VKGC_ENSUREF(false, "unsupported swapchain recreation request");
             // recreate swapchain
             return false;
 
@@ -720,10 +729,7 @@ bool run_app()
 
 int main()
 {
-    if (!vkgc::bootstrap_app())
-    {
-        return -1;
-    }
+    vkgc::bootstrap_app();
 
     if (!run_app())
     {

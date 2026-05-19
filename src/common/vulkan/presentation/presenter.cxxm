@@ -1,7 +1,7 @@
 module;
 
 #include <cstdint>
-#include <optional>
+#include <expected>
 #include <span>
 #include <vector>
 
@@ -77,12 +77,13 @@ export namespace vkgc
         VkExtent2D extent() const noexcept;
 
         // Acquires the next swapchain image using the slot-indexed
-        // image_acquired_semaphores_[frame_index]. Returns std::nullopt on
-        // VK_ERROR_OUT_OF_DATE_KHR; VK_SUBOPTIMAL_KHR returns normally and
-        // the suboptimal status surfaces at present(). The returned semaphore
-        // is pre-resolved for the caller to wait on in vkQueueSubmit.
+        // image_acquired_semaphores_[frame_index]. Returns the unexpected
+        // present_status on VK_ERROR_OUT_OF_DATE_KHR or other failure;
+        // VK_SUBOPTIMAL_KHR returns normally and the suboptimal status
+        // surfaces at present(). The returned semaphore is pre-resolved for
+        // the caller to wait on in vkQueueSubmit.
         [[nodiscard]]
-        std::optional<swapchain_image_acquire_result> acquire_image(std::uint32_t frame_index);
+        std::expected<swapchain_image_acquire_result, present_status> acquire_image(std::uint32_t frame_index);
 
         [[nodiscard]]
         present_status present(VkQueue queue, std::uint32_t image_index, VkSemaphore wait_semaphore);

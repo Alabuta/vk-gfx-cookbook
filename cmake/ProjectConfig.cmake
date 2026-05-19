@@ -16,10 +16,8 @@ function(configure_cookbook_target TARGET_NAME)
 
     target_sources(${TARGET_NAME}
         PRIVATE
-            ${CMAKE_SOURCE_DIR}/src/common/diagnostic/assert.cxx
             ${CMAKE_SOURCE_DIR}/src/common/app/bootstrap.cxx
             ${CMAKE_SOURCE_DIR}/src/common/app/window.cxx
-            ${CMAKE_SOURCE_DIR}/src/common/vulkan/assert.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/device_creation.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/surface.cxx
@@ -35,11 +33,8 @@ function(configure_cookbook_target TARGET_NAME)
             FILE_SET cookbook_modules TYPE CXX_MODULES
                 BASE_DIRS ${CMAKE_SOURCE_DIR}/src/common
                 FILES
-                    ${CMAKE_SOURCE_DIR}/src/common/diagnostic/assert.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/app/bootstrap.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/app/window.cxxm
-                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/format.cxxm
-                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/assert.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/utility/ext_structs_chain.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/surface.cxxm

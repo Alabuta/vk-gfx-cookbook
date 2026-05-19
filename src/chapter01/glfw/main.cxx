@@ -3,13 +3,10 @@ import vkgc.window;
 
 int main()
 {
-    if (!cookbook::bootstrap_app())
-    {
-        return -1;
-    }
+    vkgc::bootstrap_app();
 
     {
-        cookbook::window const window{"GLFW example", 1280, 800};
+        vkgc::window const window{"GLFW example", 1280, 800};
         if (!window)
         {
             return -1;
@@ -17,9 +14,9 @@ int main()
 
         while (!window.should_close())
         {
-            cookbook::tick_app(nullptr);
+            vkgc::run_app(nullptr);
         }
     }
 
-    cookbook::terminate_app();
+    vkgc::terminate_app();
 }

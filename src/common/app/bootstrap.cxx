@@ -7,11 +7,14 @@ module;
 
 #include <GLFW/glfw3.h>
 
+#include "diagnostic/assert.hxx"
+#include "vulkan/assert.hxx"
+
 module vkgc.bootstrap;
 
 namespace vkgc
 {
-    bool bootstrap_app()
+    void bootstrap_app()
     {
         glfwSetErrorCallback(
             [](int const error, char const* description)
@@ -19,19 +22,8 @@ namespace vkgc
                 std::println("GLFW Error ({:#06x}): {}", error, description);
             });
 
-        if (glfwInit() != GLFW_TRUE)
-        {
-            std::println("GLFW initialization failed");
-            return false;
-        }
-
-        if (volkInitialize() != VK_SUCCESS)
-        {
-            std::println("'volk' meta-loader initialization failed");
-            return false;
-        }
-
-        return true;
+        VKGC_VERIFYF(glfwInit() == GLFW_TRUE, "GLFW initialization failed");
+        VKGC_VERIFYF_VKSUCCESS(volkInitialize(), "'volk' meta-loader initialization failed");
     }
 
     void run_app(std::function<bool()> const& callback)

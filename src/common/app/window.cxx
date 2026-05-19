@@ -4,11 +4,14 @@ module;
 #include <string>
 
 #include <volk.h>
+#include "vulkan/format.hxx"
 #include <GLFW/glfw3.h>
+
+#include "diagnostic/assert.hxx"
+#include "vulkan/assert.hxx"
 
 module vkgc.window;
 
-import vkgc.vulkan_format;
 
 namespace vkgc
 {
@@ -18,9 +21,8 @@ namespace vkgc
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         handle_ = glfwCreateWindow(static_cast<int>(width), static_cast<int>(height), title.c_str(), nullptr, nullptr);
-        if (handle_ == nullptr)
+        if (!VKGC_ENSURE(handle_ != nullptr))
         {
-            std::println(stderr, "[GLFW] : Fatal : failed to create window");
             return;
         }
 
@@ -39,7 +41,7 @@ namespace vkgc
 
     window::~window()
     {
-        if (handle_ != nullptr)
+        if (VKGC_ENSURE(handle_ != nullptr))
         {
             glfwDestroyWindow(handle_);
             handle_ = nullptr;
@@ -64,11 +66,8 @@ namespace vkgc
     VkSurfaceKHR window::create_vulkan_surface(VkInstance instance) const noexcept
     {
         VkSurfaceKHR surface{VK_NULL_HANDLE};
-
-        if (auto const result = glfwCreateWindowSurface(instance, handle_, nullptr, &surface);
-            result != VK_SUCCESS)
+        if (!VKGC_ENSURE_VKSUCCESS(glfwCreateWindowSurface(instance, handle_, nullptr, &surface)))
         {
-            std::println(stderr, "[GLFW] : Fatal : failed to create Vulkan window surface ({})", result);
             return VK_NULL_HANDLE;
         }
 

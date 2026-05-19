@@ -9,9 +9,11 @@ module;
 
 #include <volk.h>
 
+#include "assert.hxx"
+#include "vulkan/format.hxx"
+
 module vkgc.vulkan_frame_ring;
 
-import vkgc.vulkan_format;
 import vkgc.vulkan_handle;
 import vkgc.vulkan_object_registry;
 
@@ -92,29 +94,22 @@ namespace vkgc
 
         if (device_handle != VK_NULL_HANDLE && frame_fence != VK_NULL_HANDLE)
         {
-            if (auto const result = vkWaitForFences(
+            if (!VKGC_ENSURE_VKSUCCESS(vkWaitForFences(
                     device_handle,
                     1,
                     &frame_fence,
                     VK_TRUE,
-                    std::numeric_limits<std::uint64_t>::max());
-                result != VK_SUCCESS)
+                    std::numeric_limits<std::uint64_t>::max())))
             {
-                std::println(
-                    stderr,
-                    "[Vulkan] : Warning : vulkan_frame_ring::begin_frame fence wait failed ({})",
-                    result);
+                return std::numeric_limits<std::uint32_t>::max();
             }
 
             // Destroying previously enqueued objects
             drain_slot(current_frame_index_);
 
-            if (auto const result = vkResetFences(device_handle, 1, &frame_fence); result != VK_SUCCESS)
+            if (!VKGC_ENSURE_VKSUCCESS(vkResetFences(device_handle, 1, &frame_fence)))
             {
-                std::println(
-                    stderr,
-                    "[Vulkan] : Warning : vulkan_frame_ring::begin_frame fence reset failed ({})",
-                    result);
+                return std::numeric_limits<std::uint32_t>::max();
             }
         }
 

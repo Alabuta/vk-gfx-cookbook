@@ -6,7 +6,7 @@ export module vkgc.bootstrap;
 
 export namespace vkgc
 {
-    bool bootstrap_app();
+    void bootstrap_app();
     void run_app(std::function<bool()> const& callback);
     void terminate_app();
 }

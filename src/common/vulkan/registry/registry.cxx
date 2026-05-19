@@ -7,11 +7,12 @@ module;
 #include <vector>
 
 #include <volk.h>
+#include "vulkan/format.hxx"
 #include "vk_mem_alloc.h"
+#include "vulkan/assert.hxx"
 
 module vkgc.vulkan_object_registry;
 
-import vkgc.vulkan_format;
 import vkgc.vulkan_handle;
 import vkgc.vulkan_device;
 import vkgc.vulkan_payload;
@@ -56,7 +57,7 @@ namespace vkgc
         if (auto const result = vkCreateImage(device_.handle(), &info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create image ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create image ({})", result);
             return {};
         }
 
@@ -74,9 +75,8 @@ namespace vkgc
         VmaAllocationCreateInfo const& alloc_info)
     {
         VkImage const image_handle = resolve_handle(image);
-        if (image_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(image_handle))
         {
-            std::println(stderr, "[Vulkan] : Fatal : allocate_image_memory called with stale image handle");
             return {};
         }
 
@@ -89,7 +89,8 @@ namespace vkgc
                 nullptr);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to allocate memory for image ({})", result);
+            // Just error logging
+            std::println(stderr, "[Vulkan] : Error : failed to allocate memory for image ({})", result);
             return {};
         }
 
@@ -102,7 +103,7 @@ namespace vkgc
         if (auto const result = vkCreateBuffer(device_.handle(), &info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create buffer ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create buffer ({})", result);
             return {};
         }
 
@@ -118,9 +119,8 @@ namespace vkgc
         VmaAllocationCreateInfo const& alloc_info)
     {
         VkBuffer buffer_handle = resolve_handle(buffer);
-        if (buffer_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(buffer_handle))
         {
-            std::println(stderr, "[Vulkan] : Fatal : allocate_buffer_memory called with stale buffer handle");
             return {};
         }
 
@@ -133,7 +133,7 @@ namespace vkgc
                 nullptr);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to allocate memory for buffer ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to allocate memory for buffer ({})", result);
             return {};
         }
 
@@ -146,7 +146,7 @@ namespace vkgc
         if (auto const result = vkCreateImageView(device_.handle(), &info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create image view ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create image view ({})", result);
             return {};
         }
 
@@ -162,7 +162,7 @@ namespace vkgc
         if (auto const result = vkCreateFence(device_.handle(), &info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create fence ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create fence ({})", result);
             return {};
         }
 
@@ -175,7 +175,7 @@ namespace vkgc
         if (auto const result = vkCreateSemaphore(device_.handle(), &info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create semaphore ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create semaphore ({})", result);
             return {};
         }
 
@@ -188,7 +188,7 @@ namespace vkgc
         if (auto const result = vkCreateCommandPool(device_.handle(), &info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to create command pool ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create command pool ({})", result);
             return {};
         }
 
@@ -204,9 +204,8 @@ namespace vkgc
         bool const is_primary)
     {
         VkCommandPool command_pool_handle = resolve_handle(pool);
-        if (command_pool_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(command_pool_handle))
         {
-            std::println(stderr, "[Vulkan] : Fatal : allocate_command_buffers called with stale pool handle");
             return {};
         }
 
@@ -222,7 +221,7 @@ namespace vkgc
         if (auto const result = vkAllocateCommandBuffers(device_.handle(), &allocate_info, raw_handles.data());
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to allocate command buffers ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to allocate command buffers ({})", result);
             return {};
         }
 

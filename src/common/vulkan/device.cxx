@@ -5,11 +5,11 @@ module;
 #include <print>
 
 #include <volk.h>
+#include "vulkan/format.hxx"
 #include "vk_mem_alloc.h"
 
 module vkgc.vulkan_device;
 
-import vkgc.vulkan_format;
 
 namespace vkgc
 {

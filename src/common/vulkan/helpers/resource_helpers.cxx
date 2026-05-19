@@ -5,11 +5,12 @@ module;
 #include <vector>
 
 #include <volk.h>
+#include "vulkan/format.hxx"
 #include "vk_mem_alloc.h"
+#include "vulkan/assert.hxx"
 
 module vkgc.vulkan_resource_helpers;
 
-import vkgc.vulkan_format;
 import vkgc.vulkan_handle;
 import vkgc.vulkan_device;
 import vkgc.vulkan_object_registry;
@@ -22,11 +23,14 @@ namespace vkgc
         vk_allocation_handle const memory)
     {
         VkImage image_handle = resources.resolve_handle(image);
-        VmaAllocation vma_allocation_handle = resources.resolve_handle(memory);
-
-        if (image_handle == VK_NULL_HANDLE || vma_allocation_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(image_handle))
         {
-            std::println(stderr, "[Vulkan] : Fatal : bind_image_memory called with stale handle(s)");
+            return false;
+        }
+
+        VmaAllocation vma_allocation_handle = resources.resolve_handle(memory);
+        if (!VKGC_ENSURE_VKHANDLE(vma_allocation_handle))
+        {
             return false;
         }
 
@@ -36,7 +40,7 @@ namespace vkgc
                 image_handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to bind image memory ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to bind image memory ({})", result);
             return false;
         }
 
@@ -49,11 +53,14 @@ namespace vkgc
         vk_allocation_handle const memory)
     {
         VkBuffer buffer_handle = resources.resolve_handle(buffer);
-        VmaAllocation vma_allocation_handle = resources.resolve_handle(memory);
-
-        if (buffer_handle == VK_NULL_HANDLE || vma_allocation_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(buffer_handle))
         {
-            std::println(stderr, "[Vulkan] : Fatal : bind_buffer_memory called with stale handle(s)");
+            return false;
+        }
+
+        VmaAllocation vma_allocation_handle = resources.resolve_handle(memory);
+        if (!VKGC_ENSURE_VKHANDLE(vma_allocation_handle))
+        {
             return false;
         }
 
@@ -63,7 +70,7 @@ namespace vkgc
                 buffer_handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Fatal : failed to bind buffer memory ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to bind buffer memory ({})", result);
             return false;
         }
 
