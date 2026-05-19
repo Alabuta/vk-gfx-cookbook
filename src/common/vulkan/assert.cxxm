@@ -1,0 +1,34 @@
+module;
+
+#include <source_location>
+#include <string_view>
+
+#include <volk.h>
+
+export module cookbook.vulkan_diagnostic;
+
+import cookbook.diagnostic;
+
+// See `diagnostic/assert.cxxm` for the rationale on keeping `<atomic>` out
+// of module interfaces — the once-only flag check lives at the macro site.
+
+export namespace vkgc::assert_detail
+{
+    // Format a VkResult into "[VK_ERROR_XXX]" / "[VK_ERROR_XXX] message" and
+    // forward to `fatal_log` with the "Vulkan" category. Caller still has to
+    // trigger the debug-break / abort.
+    void vk_fatal(
+        VkResult result,
+        std::string_view expression,
+        std::string_view message,
+        std::source_location location) noexcept;
+
+    // Same shape as `vk_fatal`, but routes through `ensure_log`. Caller
+    // owns the once-only gating (via a static `std::atomic_flag` in the
+    // macro).
+    void vk_ensure_log(
+        VkResult result,
+        std::string_view expression,
+        std::string_view message,
+        std::source_location location) noexcept;
+}
