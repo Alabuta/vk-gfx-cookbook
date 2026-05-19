@@ -7,12 +7,12 @@ module;
 #include <volk.h>
 #include "vk_mem_alloc.h"
 
-module cookbook.vulkan_resource_helpers;
+module vkgc.vulkan_resource_helpers;
 
-import cookbook.vulkan_format;
-import cookbook.vulkan_handle;
-import cookbook.vulkan_device;
-import cookbook.vulkan_object_registry;
+import vkgc.vulkan_format;
+import vkgc.vulkan_handle;
+import vkgc.vulkan_device;
+import vkgc.vulkan_object_registry;
 
 namespace vkgc
 {

@@ -1,5 +1,5 @@
-import cookbook.bootstrap;
-import cookbook.window;
+import vkgc.bootstrap;
+import vkgc.window;
 
 int main()
 {

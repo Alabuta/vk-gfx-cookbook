@@ -4,7 +4,7 @@
 //
 // Macros forward to `vkgc::assert_detail::fatal_log` /
 // `vkgc::assert_detail::ensure_log_once`, which are exported by the
-// `cookbook.diagnostic` module — imported below.
+// `vkgc.diagnostic` module — imported below.
 //
 // Include this header at file scope of a non-module TU, or inside the
 // purview of a module unit. Do NOT include from a module's global module
@@ -15,7 +15,7 @@
 #include <format>
 #include <source_location>
 
-import cookbook.diagnostic;
+import vkgc.diagnostic;
 
 #if defined(__cpp_lib_debugging)
     import <debugging>;

@@ -7,9 +7,9 @@ module;
 #include <volk.h>
 #include "vk_mem_alloc.h"
 
-module cookbook.vulkan_device;
+module vkgc.vulkan_device;
 
-import cookbook.vulkan_format;
+import vkgc.vulkan_format;
 
 namespace vkgc
 {

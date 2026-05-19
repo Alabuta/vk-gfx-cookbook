@@ -2,7 +2,7 @@ module;
 
 #include <volk.h>
 
-module cookbook.vulkan_surface;
+module vkgc.vulkan_surface;
 
 namespace vkgc
 {

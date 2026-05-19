@@ -7,9 +7,9 @@ module;
 
 #include <volk.h>
 
-module cookbook.vulkan_device_features;
+module vkgc.vulkan_device_features;
 
-import cookbook.vulkan_helpers;
+import vkgc.vulkan_helpers;
 
 namespace
 {

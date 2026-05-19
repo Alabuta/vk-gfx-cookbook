@@ -12,9 +12,9 @@ module;
 
 #include "config.hxx"
 
-module cookbook.vulkan_instance;
+module vkgc.vulkan_instance;
 
-import cookbook.vulkan_format;
+import vkgc.vulkan_format;
 
 namespace
 {

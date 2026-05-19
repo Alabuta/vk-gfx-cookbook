@@ -5,10 +5,10 @@ module;
 #include <volk.h>
 #include "vk_mem_alloc.h"
 
-module cookbook.vulkan_object_registry;
+module vkgc.vulkan_object_registry;
 
-import cookbook.vulkan_device;
-import cookbook.vulkan_payload;
+import vkgc.vulkan_device;
+import vkgc.vulkan_payload;
 
 namespace vkgc
 {

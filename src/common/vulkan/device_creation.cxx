@@ -17,10 +17,10 @@ module;
 
 #include "GLFW/glfw3.h"
 
-module cookbook.vulkan_instance;
+module vkgc.vulkan_instance;
 
-import cookbook.vulkan_format;
-import cookbook.vulkan_device_features;
+import vkgc.vulkan_format;
+import vkgc.vulkan_device_features;
 
 namespace
 {

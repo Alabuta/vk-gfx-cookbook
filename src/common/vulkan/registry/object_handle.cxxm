@@ -2,7 +2,7 @@ module;
 
 #include <cstdint>
 
-export module cookbook.vulkan_handle;
+export module vkgc.vulkan_handle;
 
 export namespace vkgc::vk_object_tags
 {

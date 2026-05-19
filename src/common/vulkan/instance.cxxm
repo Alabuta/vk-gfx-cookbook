@@ -8,11 +8,11 @@ module;
 
 #include "config.hxx"
 
-export module cookbook.vulkan_instance;
+export module vkgc.vulkan_instance;
 
-import cookbook.window;
-import cookbook.vulkan_surface;
-import cookbook.vulkan_device;
+import vkgc.window;
+import vkgc.vulkan_surface;
+import vkgc.vulkan_device;
 
 export namespace vkgc
 {

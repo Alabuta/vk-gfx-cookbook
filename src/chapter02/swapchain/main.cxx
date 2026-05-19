@@ -16,17 +16,17 @@
 #include "vulkan/assert.hxx"
 #include "GLFW/glfw3.h"
 
-import cookbook.vulkan_format;
-import cookbook.bootstrap;
-import cookbook.window;
-import cookbook.vulkan_instance;
-import cookbook.vulkan_surface;
-import cookbook.vulkan_device;
-import cookbook.vulkan_handle;
-import cookbook.vulkan_object_registry;
-import cookbook.vulkan_resource_helpers;
-import cookbook.vulkan_presenter;
-import cookbook.vulkan_frame_ring;
+import vkgc.vulkan_format;
+import vkgc.bootstrap;
+import vkgc.window;
+import vkgc.vulkan_instance;
+import vkgc.vulkan_surface;
+import vkgc.vulkan_device;
+import vkgc.vulkan_handle;
+import vkgc.vulkan_object_registry;
+import vkgc.vulkan_resource_helpers;
+import vkgc.vulkan_presenter;
+import vkgc.vulkan_frame_ring;
 
 namespace vkgc
 {
@@ -678,7 +678,7 @@ bool run_app()
 
             VKGC_VERIFYF_VKSUCCESS(
                 vkQueueSubmit(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence),
-                "frame #{}", frame_index);
+                "frame-in-flight index #{}", frame_index);
 
             /*if (auto const result = vkQueueSubmit(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence);
                 result != VK_SUCCESS)

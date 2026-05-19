@@ -4,7 +4,7 @@ module;
 
 #include <volk.h>
 
-export module cookbook.vulkan_format;
+export module vkgc.vulkan_format;
 
 // `std::formatter` specializations for Vulkan enums.
 //

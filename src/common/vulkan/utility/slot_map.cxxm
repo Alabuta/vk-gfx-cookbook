@@ -6,9 +6,9 @@ module;
 #include <utility>
 #include <vector>
 
-export module cookbook.vulkan_slot_map;
+export module vkgc.vulkan_slot_map;
 
-import cookbook.vulkan_handle;
+import vkgc.vulkan_handle;
 
 export namespace vkgc
 {

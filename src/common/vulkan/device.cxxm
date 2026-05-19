@@ -8,7 +8,7 @@ module;
 #include <volk.h>
 #include "vk_mem_alloc.h"
 
-export module cookbook.vulkan_device;
+export module vkgc.vulkan_device;
 
 export namespace vkgc
 {

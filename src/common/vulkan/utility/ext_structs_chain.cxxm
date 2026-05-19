@@ -5,7 +5,7 @@ module;
 
 #include <volk.h>
 
-export module cookbook.vulkan_helpers;
+export module vkgc.vulkan_helpers;
 
 export namespace vkgc
 {

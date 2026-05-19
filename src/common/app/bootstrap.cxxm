@@ -2,7 +2,7 @@ module;
 
 #include <functional>
 
-export module cookbook.bootstrap;
+export module vkgc.bootstrap;
 
 export namespace vkgc
 {

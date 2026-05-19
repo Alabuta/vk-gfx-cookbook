@@ -3,7 +3,7 @@ module;
 #include <source_location>
 #include <string_view>
 
-export module cookbook.diagnostic;
+export module vkgc.diagnostic;
 
 // Note: `<atomic>` is deliberately NOT included here. On MinGW/libstdc++,
 // `<atomic>` transitively pulls in gthr-default.h, whose inline functions

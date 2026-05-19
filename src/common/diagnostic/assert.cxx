@@ -7,7 +7,7 @@ module;
 #include <string>
 #include <string_view>
 
-module cookbook.diagnostic;
+module vkgc.diagnostic;
 
 namespace vkgc::assert_detail
 {

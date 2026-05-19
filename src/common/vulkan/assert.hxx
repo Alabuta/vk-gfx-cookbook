@@ -4,12 +4,12 @@
 //
 // Macros forward to `vkgc::assert_detail::vk_fatal` /
 // `vkgc::assert_detail::vk_ensure_log`, exported by the
-// `cookbook.vulkan_diagnostic` module. The VkResult-to-string formatting
+// `vkgc.vulkan_diagnostic` module. The VkResult-to-string formatting
 // happens inside those functions (the module implementation imports
-// `cookbook.vulkan_format`), so the macro expansion site does NOT need a
+// `vkgc.vulkan_format`), so the macro expansion site does NOT need a
 // VkResult formatter visible. Consumers who want to format VkResult in
 // their own `std::format` / `std::println` calls should
-// `import cookbook.vulkan_format;` separately.
+// `import vkgc.vulkan_format;` separately.
 //
 // Same include-site constraints as `diagnostic/assert.hxx`: include at file
 // scope of a non-module TU or inside a module purview, not inside a global
@@ -23,7 +23,7 @@
 
 #include "diagnostic/assert.hxx"
 
-import cookbook.vulkan_diagnostic;
+import vkgc.vulkan_diagnostic;
 
 #if VKGC_DO_CHECK
     #define VKGC_CHECK_VKSUCCESS(call)\

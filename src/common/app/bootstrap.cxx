@@ -7,7 +7,7 @@ module;
 
 #include <GLFW/glfw3.h>
 
-module cookbook.bootstrap;
+module vkgc.bootstrap;
 
 namespace vkgc
 {

@@ -6,9 +6,9 @@ module;
 #include <volk.h>
 #include <GLFW/glfw3.h>
 
-module cookbook.window;
+module vkgc.window;
 
-import cookbook.vulkan_format;
+import vkgc.vulkan_format;
 
 namespace vkgc
 {

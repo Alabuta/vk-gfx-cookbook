@@ -7,10 +7,10 @@ module;
 
 #include <volk.h>
 
-module cookbook.vulkan_diagnostic;
+module vkgc.vulkan_diagnostic;
 
-import cookbook.diagnostic;
-import cookbook.vulkan_format;
+import vkgc.diagnostic;
+import vkgc.vulkan_format;
 
 namespace vkgc::assert_detail
 {

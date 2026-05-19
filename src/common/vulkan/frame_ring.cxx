@@ -9,11 +9,11 @@ module;
 
 #include <volk.h>
 
-module cookbook.vulkan_frame_ring;
+module vkgc.vulkan_frame_ring;
 
-import cookbook.vulkan_format;
-import cookbook.vulkan_handle;
-import cookbook.vulkan_object_registry;
+import vkgc.vulkan_format;
+import vkgc.vulkan_handle;
+import vkgc.vulkan_object_registry;
 
 namespace vkgc
 {

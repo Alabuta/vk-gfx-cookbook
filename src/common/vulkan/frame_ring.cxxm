@@ -4,10 +4,10 @@ module;
 #include <tuple>
 #include <vector>
 
-export module cookbook.vulkan_frame_ring;
+export module vkgc.vulkan_frame_ring;
 
-import cookbook.vulkan_handle;
-import cookbook.vulkan_object_registry;
+import vkgc.vulkan_handle;
+import vkgc.vulkan_object_registry;
 
 export namespace vkgc
 {
