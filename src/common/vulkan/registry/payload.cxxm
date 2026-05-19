@@ -1,0 +1,121 @@
+module;
+
+#include <cstdint>
+#include <limits>
+
+#include <volk.h>
+#include "vk_mem_alloc.h"
+
+export module cookbook.vulkan_payload;
+
+import cookbook.vulkan_handle;
+
+export namespace vkgc
+{
+    struct image_payload
+    {
+        VkImage handle{VK_NULL_HANDLE};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+        VkExtent3D extent{};
+        std::uint32_t mip_levels{1};
+        std::uint32_t array_layers{1};
+    };
+
+    struct image_view_payload
+    {
+        VkImageView handle{VK_NULL_HANDLE};
+        VkFormat format{VK_FORMAT_UNDEFINED};
+    };
+
+    struct buffer_payload
+    {
+        VkBuffer handle{VK_NULL_HANDLE};
+        VkDeviceSize size{0};
+        VkBufferUsageFlags usage{0};
+    };
+
+    struct allocation_payload
+    {
+        VmaAllocation handle{VK_NULL_HANDLE};
+    };
+
+    struct fence_payload
+    {
+        VkFence handle{VK_NULL_HANDLE};
+    };
+
+    struct semaphore_payload
+    {
+        VkSemaphore handle{VK_NULL_HANDLE};
+    };
+
+    struct command_pool_payload
+    {
+        VkCommandPool handle{VK_NULL_HANDLE};
+        std::uint32_t queue_family_index{std::numeric_limits<std::uint32_t>::max()};
+    };
+
+    struct command_buffer_payload
+    {
+        VkCommandBuffer handle{VK_NULL_HANDLE};
+        VkCommandPool source_pool{VK_NULL_HANDLE};
+        bool is_primary{false};
+    };
+
+    /*
+     * Tag -> Payload mapping.
+     */
+    template <typename Tag>
+    struct vk_object_payload;
+
+    template <>
+    struct vk_object_payload<vk_object_tags::image>
+    {
+        using type = image_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::image_view>
+    {
+        using type = image_view_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::buffer>
+    {
+        using type = buffer_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::allocation>
+    {
+        using type = allocation_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::fence>
+    {
+        using type = fence_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::semaphore>
+    {
+        using type = semaphore_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::command_pool>
+    {
+        using type = command_pool_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::command_buffer>
+    {
+        using type = command_buffer_payload;
+    };
+
+    template <typename Tag>
+    using vk_object_payload_t = vk_object_payload<Tag>::type;
+}

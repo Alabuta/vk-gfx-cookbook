@@ -1,0 +1,46 @@
+module;
+
+#include <cstdint>
+
+export module cookbook.vulkan_handle;
+
+export namespace vkgc::vk_object_tags
+{
+    struct image{};
+    struct image_view{};
+    struct buffer{};
+    struct allocation{};
+    struct fence{};
+    struct semaphore{};
+    struct command_pool{};
+    struct command_buffer{};
+}
+
+export namespace vkgc
+{
+    template <typename T>
+    struct vk_object_handle
+    {
+        using TypeTag = T;
+
+        std::uint32_t index{0};
+        std::uint32_t generation{0};
+
+        [[nodiscard]]
+        bool is_valid() const noexcept
+        {
+            return generation != 0;
+        }
+
+        // friend bool operator==(vulkan_handle, vulkan_handle) noexcept = default;
+    };
+
+    using vk_image_handle = vk_object_handle<vk_object_tags::image>;
+    using vk_image_view_handle = vk_object_handle<vk_object_tags::image_view>;
+    using vk_buffer_handle = vk_object_handle<vk_object_tags::buffer>;
+    using vk_allocation_handle = vk_object_handle<vk_object_tags::allocation>;
+    using vk_fence_handle = vk_object_handle<vk_object_tags::fence>;
+    using vk_semaphore_handle = vk_object_handle<vk_object_tags::semaphore>;
+    using vk_command_pool_handle = vk_object_handle<vk_object_tags::command_pool>;
+    using vk_command_buffer_handle = vk_object_handle<vk_object_tags::command_buffer>;
+}

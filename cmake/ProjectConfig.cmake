@@ -21,6 +21,8 @@ function(configure_cookbook_target TARGET_NAME)
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance_device_factory.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/surface.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/registry.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/destructors.cxx
 
         PRIVATE
             FILE_SET cookbook_modules TYPE CXX_MODULES
@@ -32,6 +34,10 @@ function(configure_cookbook_target TARGET_NAME)
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/surface.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/object_handle.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/utility/slot_map.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/payload.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/registry.cxxm
     )
 
     target_link_libraries(${TARGET_NAME}
