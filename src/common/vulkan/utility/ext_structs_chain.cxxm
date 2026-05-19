@@ -7,7 +7,7 @@ module;
 
 export module cookbook.vulkan_helpers;
 
-export namespace cookbook
+export namespace vkgc
 {
     template <typename T>
     concept ChainableVkStructure = requires(T& t, void* p)
@@ -47,30 +47,22 @@ export namespace cookbook
         vulkan_extending_structs_chain(vulkan_extending_structs_chain&&) = delete;
         vulkan_extending_structs_chain& operator=(vulkan_extending_structs_chain&&) = delete;
 
+        template <typename S>
         [[nodiscard]]
-        auto const* as_pointer() const noexcept
+        auto as_pointer(this S&& self) noexcept
+            -> decltype(&self.template get<0>())
         {
-            return &get<0>();
+            return &self.template get<0>();
         }
 
+        template <std::size_t I, typename S>
         [[nodiscard]]
-        auto* as_pointer() noexcept
+        auto get(this S&& self) noexcept
+            -> std::conditional_t<
+                std::is_const_v<std::remove_reference_t<S>>,
+                std::tuple_element_t<I, Tuple> const&, std::tuple_element_t<I, Tuple>&>
         {
-            return &get<0>();
-        }
-
-        template <std::size_t I>
-        [[nodiscard]]
-        auto get() const noexcept -> std::tuple_element_t<I, Tuple> const&
-        {
-            return std::get<I>(structs_);
-        }
-
-        template <std::size_t I>
-        [[nodiscard]]
-        auto get() noexcept -> std::tuple_element_t<I, Tuple>&
-        {
-            return std::get<I>(structs_);
+            return std::get<I>(self.structs_);
         }
 
     private:

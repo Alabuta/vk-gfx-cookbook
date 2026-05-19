@@ -11,33 +11,47 @@ function(configure_cookbook_target TARGET_NAME)
     target_include_directories(${TARGET_NAME}
         PRIVATE
             ${CMAKE_SOURCE_DIR}/src
+            ${CMAKE_SOURCE_DIR}/src/common
     )
 
     target_sources(${TARGET_NAME}
         PRIVATE
+            ${CMAKE_SOURCE_DIR}/src/common/diagnostic/assert.cxx
             ${CMAKE_SOURCE_DIR}/src/common/app/bootstrap.cxx
             ${CMAKE_SOURCE_DIR}/src/common/app/window.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/assert.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxx
-            ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance_device_factory.cxx
-            ${CMAKE_SOURCE_DIR}/src/common/vulkan/surface.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/device_creation.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/surface.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/device_features.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/registry.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/destructors.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/helpers/resource_helpers.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/presenter.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/frame_ring.cxx
 
         PRIVATE
             FILE_SET cookbook_modules TYPE CXX_MODULES
                 BASE_DIRS ${CMAKE_SOURCE_DIR}/src/common
                 FILES
+                    ${CMAKE_SOURCE_DIR}/src/common/diagnostic/assert.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/app/bootstrap.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/app/window.cxxm
-                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/helpers.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/format.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/assert.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/utility/ext_structs_chain.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxxm
-                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/surface.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/surface.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/device_features.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/object_handle.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/utility/slot_map.cxxm
-                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/payload.cxxm
                     ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/registry.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/helpers/resource_helpers.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/presenter.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/registry/payload.cxxm
+                    ${CMAKE_SOURCE_DIR}/src/common/vulkan/frame_ring.cxxm
     )
 
     target_link_libraries(${TARGET_NAME}
@@ -78,7 +92,11 @@ function(configure_cookbook_target TARGET_NAME)
 
     target_compile_definitions(${TARGET_NAME}
         PRIVATE
-            $<$<CONFIG:Debug>:VULKAN_DEBUG>
+
+            VKGC_DO_ENSURE=1
+            VKGC_DO_CHECK=$<IF:$<CONFIG:Debug>,1,0>
+
+            VKGC_DEBUG_VULKAN=$<IF:$<CONFIG:Debug>,1,0>
 
             # To avoid symbolic conflicts between 'volk.h' and 'vulkan/vulkan.h'
             VK_NO_PROTOTYPES

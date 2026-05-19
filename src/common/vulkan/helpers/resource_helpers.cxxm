@@ -1,0 +1,54 @@
+module;
+
+#include <cstdint>
+
+#include <volk.h>
+#include "vk_mem_alloc.h"
+
+export module cookbook.vulkan_resource_helpers;
+
+import cookbook.vulkan_handle;
+import cookbook.vulkan_object_registry;
+
+export namespace vkgc
+{
+    struct image_with_memory
+    {
+        vk_image_handle image{};
+        vk_allocation_handle memory{};
+    };
+
+    struct buffer_with_memory
+    {
+        vk_buffer_handle buffer{};
+        vk_allocation_handle memory{};
+    };
+
+    [[nodiscard]]
+    bool bind_image_memory(
+        vulkan_object_registry const& resources,
+        vk_image_handle image,
+        vk_allocation_handle memory);
+
+    [[nodiscard]]
+    bool bind_buffer_memory(
+        vulkan_object_registry const& resources,
+        vk_buffer_handle buffer,
+        vk_allocation_handle memory);
+
+    [[nodiscard]]
+    bool create_memory_bound_image(
+        vulkan_object_registry& resources,
+        VkImageCreateInfo const& create_info,
+        VmaAllocationCreateInfo const& alloc_info,
+        vk_image_handle& out_image,
+        vk_allocation_handle& out_memory);
+
+    [[nodiscard]]
+    bool create_memory_bound_buffer(
+        vulkan_object_registry& resources,
+        VkBufferCreateInfo const& create_info,
+        VmaAllocationCreateInfo const& alloc_info,
+        vk_buffer_handle& out_buffer,
+        vk_allocation_handle& out_memory);
+}

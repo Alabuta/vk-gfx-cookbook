@@ -4,7 +4,7 @@ module;
 
 export module cookbook.vulkan_surface;
 
-export namespace cookbook
+export namespace vkgc
 {
     class vulkan_surface final
     {

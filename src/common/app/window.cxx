@@ -6,11 +6,11 @@ module;
 #include <volk.h>
 #include <GLFW/glfw3.h>
 
-#include "vulkan_format.hxx"
-
 module cookbook.window;
 
-namespace cookbook
+import cookbook.vulkan_format;
+
+namespace vkgc
 {
     window::window(std::string const& title, uint32_t const width, uint32_t const height) noexcept
     {

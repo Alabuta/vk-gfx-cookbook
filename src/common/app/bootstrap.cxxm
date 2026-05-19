@@ -4,9 +4,9 @@ module;
 
 export module cookbook.bootstrap;
 
-export namespace cookbook
+export namespace vkgc
 {
     bool bootstrap_app();
-    void tick_app(std::function<void()>&& callback);
+    void run_app(std::function<bool()> const& callback);
     void terminate_app();
 }

@@ -7,7 +7,7 @@ module;
 
 export module cookbook.window;
 
-export namespace cookbook
+export namespace vkgc
 {
     class window
     {

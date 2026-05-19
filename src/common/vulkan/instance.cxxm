@@ -1,9 +1,12 @@
 module;
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include <volk.h>
+
+#include "config.hxx"
 
 export module cookbook.vulkan_instance;
 
@@ -11,8 +14,12 @@ import cookbook.window;
 import cookbook.vulkan_surface;
 import cookbook.vulkan_device;
 
-export namespace cookbook
+export namespace vkgc
 {
+    std::uint32_t constexpr kVulkanApiVersion{
+        VK_MAKE_API_VERSION(0, COOKBOOK_VULKAN_API_VERSION_MAJOR, COOKBOOK_VULKAN_API_VERSION_MINOR, 0)
+    };
+
     struct vulkan_instance_info
     {
         std::vector<std::string> extensions{};
@@ -36,7 +43,7 @@ export namespace cookbook
         [[nodiscard]] explicit operator bool() const noexcept;
         [[nodiscard]] VkInstance handle() const noexcept;
 
-        [[nodiscard]] vulkan_surface create_surface(window const& w) noexcept;
+        [[nodiscard]] vulkan_surface create_window_surface(window const& w) noexcept;
         [[nodiscard]] vulkan_device create_device(vulkan_device_info const& info) noexcept;
 
     private:

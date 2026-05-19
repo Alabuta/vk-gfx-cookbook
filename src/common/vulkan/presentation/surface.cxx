@@ -4,7 +4,7 @@ module;
 
 module cookbook.vulkan_surface;
 
-namespace cookbook
+namespace vkgc
 {
     vulkan_surface::vulkan_surface(VkInstance instance, VkSurfaceKHR handle) noexcept
         : instance_{instance}, handle_{handle}

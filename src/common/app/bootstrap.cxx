@@ -9,7 +9,7 @@ module;
 
 module cookbook.bootstrap;
 
-namespace cookbook
+namespace vkgc
 {
     bool bootstrap_app()
     {
@@ -34,13 +34,21 @@ namespace cookbook
         return true;
     }
 
-    void tick_app(std::function<void()>&& callback)
+    void run_app(std::function<bool()> const& callback)
     {
-        glfwPollEvents();
-
-        if (callback)
+        bool continue_app_run{true};
+        while (continue_app_run)
         {
-            callback();
+            glfwPollEvents();
+
+            if (callback)
+            {
+                continue_app_run = callback();
+            }
+            else
+            {
+                continue_app_run = false;
+            }
         }
     }
 

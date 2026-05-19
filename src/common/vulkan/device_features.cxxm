@@ -1,0 +1,25 @@
+module;
+
+#include <volk.h>
+
+export module cookbook.vulkan_device_features;
+
+import cookbook.vulkan_helpers;
+
+export namespace vkgc
+{
+    using vulkan_device_features_chain = vulkan_extending_structs_chain<
+        VkPhysicalDeviceFeatures2,
+        VkPhysicalDeviceVulkan11Features,
+        VkPhysicalDeviceVulkan12Features,
+        VkPhysicalDeviceVulkan13Features,
+        VkPhysicalDeviceVulkan14Features>;
+
+    [[nodiscard]]
+    bool check_device_features_support(
+        VkPhysicalDevice physical_device,
+        VkPhysicalDeviceProperties2 const& device_properties);
+
+    [[nodiscard]]
+    vulkan_device_features_chain build_device_features_chain();
+}

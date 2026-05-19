@@ -1,0 +1,112 @@
+module;
+
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <vector>
+
+#include <volk.h>
+
+export module cookbook.vulkan_presenter;
+
+import cookbook.vulkan_device;
+import cookbook.vulkan_handle;
+import cookbook.vulkan_object_registry;
+
+export namespace vkgc
+{
+    struct vulkan_swapchain_info
+    {
+        VkSurfaceKHR surface{VK_NULL_HANDLE};
+        VkExtent2D extent{};
+        VkSurfaceFormatKHR surface_format{};
+        VkPresentModeKHR present_mode{VK_PRESENT_MODE_FIFO_KHR};
+        VkImageUsageFlags image_usage{};
+        std::uint32_t min_image_count{0};
+        VkSurfaceTransformFlagBitsKHR pre_transform{VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR};
+    };
+
+    struct swapchain_image_acquire_result
+    {
+        VkSemaphore image_acquired{VK_NULL_HANDLE};
+        std::uint32_t image_index{0};
+    };
+
+    enum class present_status
+    {
+        ok,
+        suboptimal,
+        out_of_date,
+        error
+    };
+
+    class vulkan_presenter final
+    {
+    public:
+
+        vulkan_presenter(
+            vulkan_device const& device,
+            vulkan_object_registry& object_registry,
+            vulkan_swapchain_info const& info,
+            std::uint32_t frames_in_flight);
+
+        ~vulkan_presenter();
+
+        vulkan_presenter(vulkan_presenter const&) = delete;
+        vulkan_presenter(vulkan_presenter&&) = delete;
+
+        vulkan_presenter& operator=(vulkan_presenter const&) = delete;
+        vulkan_presenter& operator=(vulkan_presenter&&) = delete;
+
+        [[nodiscard]]
+        bool is_valid() const noexcept;
+
+        [[nodiscard]]
+        VkSwapchainKHR swapchain_handle() const noexcept;
+
+        [[nodiscard]]
+        std::span<VkImage const> images() const noexcept;
+
+        [[nodiscard]]
+        std::uint32_t image_count() const noexcept;
+
+        [[nodiscard]]
+        VkFormat image_format() const noexcept;
+
+        [[nodiscard]]
+        VkExtent2D extent() const noexcept;
+
+        // Acquires the next swapchain image using the slot-indexed
+        // image_acquired_semaphores_[frame_index]. Returns std::nullopt on
+        // VK_ERROR_OUT_OF_DATE_KHR; VK_SUBOPTIMAL_KHR returns normally and
+        // the suboptimal status surfaces at present(). The returned semaphore
+        // is pre-resolved for the caller to wait on in vkQueueSubmit.
+        [[nodiscard]]
+        std::optional<swapchain_image_acquire_result> acquire_image(std::uint32_t frame_index);
+
+        [[nodiscard]]
+        present_status present(VkQueue queue, std::uint32_t image_index, VkSemaphore wait_semaphore);
+
+        // vkDeviceWaitIdle, then destroy the previous swapchain and rebuild
+        // (using oldSwapchain). image_acquired_semaphores_ are untouched
+        // (sized by frames_in_flight, independent of image_count).
+        void recreate(vulkan_swapchain_info const& info);
+
+    private:
+
+        vulkan_device const& device_;
+        vulkan_object_registry& object_registry_;
+
+        VkSwapchainKHR swapchain_handle_{VK_NULL_HANDLE};
+        std::vector<VkImage> images_{};
+        VkFormat image_format_{VK_FORMAT_UNDEFINED};
+        VkExtent2D extent_{};
+
+        std::vector<vk_semaphore_handle> image_acquired_semaphores_{};
+
+        void create_swapchain(vulkan_swapchain_info const& info, VkSwapchainKHR old_handle);
+        void query_swapchain_images();
+        bool create_image_acquired_semaphores(std::uint32_t count);
+        void destroy_image_acquired_semaphores();
+    };
+}
