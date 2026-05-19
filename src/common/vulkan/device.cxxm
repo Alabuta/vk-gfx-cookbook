@@ -6,10 +6,11 @@ module;
 #include <string>
 
 #include <volk.h>
+#include "vk_mem_alloc.h"
 
 export module cookbook.vulkan_device;
 
-export namespace cookbook
+export namespace vkgc
 {
     struct vulkan_device_info
     {
@@ -33,7 +34,8 @@ export namespace cookbook
         vulkan_device(
             VkPhysicalDevice physical_device,
             VkDevice handle,
-            vulkan_queue_families queue_families) noexcept;
+            vulkan_queue_families queue_families,
+            VmaAllocator vma_allocator) noexcept;
 
         ~vulkan_device();
 
@@ -51,13 +53,16 @@ export namespace cookbook
         [[nodiscard]] VkPhysicalDeviceProperties const& properties() const noexcept;
         [[nodiscard]] VkPhysicalDeviceMemoryProperties const& memory_properties() const noexcept;
 
-        [[nodiscard]] std::uint32_t main_queue_family_index() const noexcept;
-        [[nodiscard]] std::uint32_t dedicated_compute_queue_family_index() const noexcept;
-        [[nodiscard]] std::uint32_t dedicated_transfer_queue_family_index() const noexcept;
+        [[nodiscard]] VmaAllocator vma_allocator() const noexcept;
 
         [[nodiscard]] VkQueue main_queue() const noexcept;
+        [[nodiscard]] std::uint32_t main_queue_family_index() const noexcept;
+
         [[nodiscard]] VkQueue dedicated_compute_queue() const noexcept;
+        [[nodiscard]] std::uint32_t dedicated_compute_queue_family_index() const noexcept;
+
         [[nodiscard]] VkQueue dedicated_transfer_queue() const noexcept;
+        [[nodiscard]] std::uint32_t dedicated_transfer_queue_family_index() const noexcept;
 
     private:
 
@@ -66,17 +71,10 @@ export namespace cookbook
 
         vulkan_queue_families queue_families_{};
 
-        VkPhysicalDeviceProperties2 device_properties_{
-            .sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2},
-            .pNext{nullptr},
-            .properties{}
-        };
+        VmaAllocator vma_allocator_{VK_NULL_HANDLE};
 
-        VkPhysicalDeviceMemoryProperties2 memory_properties_{
-            .sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2},
-            .pNext{nullptr},
-            .memoryProperties{}
-        };
+        VkPhysicalDeviceProperties2 device_properties_{};
+        VkPhysicalDeviceMemoryProperties2 memory_properties_{};
 
         VkQueue main_queue_{VK_NULL_HANDLE};
         VkQueue dedicated_compute_queue_{VK_NULL_HANDLE};

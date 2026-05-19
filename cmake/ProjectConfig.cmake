@@ -77,6 +77,10 @@ function(configure_cookbook_target TARGET_NAME)
             # To avoid symbolic conflicts between 'volk.h' and 'vulkan/vulkan.h'
             VK_NO_PROTOTYPES
 
+            # VMA configuration macros
+            VMA_STATIC_VULKAN_FUNCTIONS=0
+            VMA_DYNAMIC_VULKAN_FUNCTIONS=1
+
             # Makes the GLFW header not include any OpenGL or OpenGL ES API header
             GLFW_INCLUDE_NONE
 
