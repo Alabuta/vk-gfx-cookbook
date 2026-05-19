@@ -198,21 +198,21 @@ bool run_app()
             .enable_validation{true}
         }
     };
-    VKGC_VERIFY(vulkan_instance);
+    VKGC_VERIFY(vulkan_instance.is_valid());
 
     auto const [width, height] = std::pair<std::uint32_t, std::uint32_t>{1280, 800};
 
     vkgc::window const window{"Swapchain example", width, height};
-    VKGC_VERIFY(window);
+    VKGC_VERIFY(window.is_valid());
 
     vkgc::vulkan_surface const window_surface = vulkan_instance.create_window_surface(window);
-    VKGC_VERIFY(window_surface);
+    VKGC_VERIFY(window_surface.is_valid());
 
     vkgc::vulkan_device vulkan_device = vulkan_instance.create_device({
         .surface{window_surface.handle()},
         .extensions{}
     });
-    VKGC_VERIFY(vulkan_device);
+    VKGC_VERIFY(vulkan_device.is_valid());
 
     vkgc::vulkan_object_registry vk_object_registry{vulkan_device};
 
@@ -496,7 +496,10 @@ bool run_app()
         }
 
         std::uint32_t const frame_index = frame_ring.begin_frame();
-        if (frame_index == std::numeric_limits<std::uint32_t>::max())
+        if (!VKGC_ENSUREF(
+            frame_index != std::numeric_limits<std::uint32_t>::max(),
+            "failed to begin [#{}] frame",
+            frame_index))
         {
             return false;
         }
@@ -521,15 +524,28 @@ bool run_app()
 
         auto const [image_acquired_semaphore, swapchain_image_index] = acquired.value();
 
+        auto const current_frame_fence = vk_object_registry.resolve_handle(frame_ring.current_frame_fence());
+        if (!VKGC_ENSURE_VKHANDLE(current_frame_fence))
+        {
+            return false;
+        }
+
+        auto const execution_complete_semaphore = vk_object_registry.resolve_handle(
+            execution_complete_semaphores[swapchain_image_index]);
+        if (!VKGC_ENSURE_VKHANDLE(execution_complete_semaphore))
+        {
+            return false;
+        }
+
         auto const command_buffer = vk_object_registry.resolve_handle(command_buffers[frame_index]);
-        if (command_buffer == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(command_buffer))
         {
             return false;
         }
 
         if (!VKGC_ENSUREF_VKSUCCESS(
             vkResetCommandBuffer(command_buffer, 0),
-            "failed to reset #{} frame command buffer", frame_index))
+            "failed to reset [#{}] frame render command buffer", frame_index))
         {
             return false;
         }
@@ -542,15 +558,16 @@ bool run_app()
                 .pInheritanceInfo{nullptr}
             };
 
-            if (auto const result = vkBeginCommandBuffer(command_buffer, &begin_info); result != VK_SUCCESS)
+            if (!VKGC_ENSUREF_VKSUCCESS(
+                vkBeginCommandBuffer(command_buffer, &begin_info),
+                "failed to begin [#{}] frame render command buffer record", frame_index))
             {
-                std::println(stderr, "[Vulkan] : Error : failed to record command buffer");
                 return false;
             }
         }
 
         auto const depth_attachment_image_handle = vk_object_registry.resolve_handle(depth_attachment_image);
-        if (depth_attachment_image_handle == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(depth_attachment_image_handle))
         {
             return false;
         }
@@ -655,21 +672,9 @@ bool run_app()
             vkCmdPipelineBarrier2(command_buffer, &dependency_info);
         }
 
-        if (auto const result = vkEndCommandBuffer(command_buffer); result != VK_SUCCESS)
-        {
-            std::println(stderr, "[Vulkan] : Error : failed to end command buffer");
-            return false;
-        }
-
-        VkFence current_frame_fence = vk_object_registry.resolve_handle(frame_ring.current_frame_fence());
-        if (current_frame_fence == VK_NULL_HANDLE)
-        {
-            return false;
-        }
-
-        VkSemaphore execution_complete_semaphore = vk_object_registry.resolve_handle(
-            execution_complete_semaphores[swapchain_image_index]);
-        if (execution_complete_semaphore == VK_NULL_HANDLE)
+        if (!VKGC_ENSUREF_VKSUCCESS(
+            vkEndCommandBuffer(command_buffer),
+            "failed to end [#{}] frame render command buffer record", frame_index))
         {
             return false;
         }
@@ -693,7 +698,7 @@ bool run_app()
 
             VKGC_VERIFYF_VKSUCCESS(
                 vkQueueSubmit(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence),
-                "failed to submit command buffer for #{} frame-in-flight", frame_index);
+                "failed to submit [#{}] frame render command buffer", frame_index);
         }
 
         frame_ring.end_frame();

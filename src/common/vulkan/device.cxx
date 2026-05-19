@@ -102,7 +102,7 @@ namespace vkgc
         vkDestroyDevice(handle_, nullptr);
     }
 
-    vulkan_device::operator bool() const noexcept
+    bool vulkan_device::is_valid() const noexcept
     {
         return physical_device_ != VK_NULL_HANDLE && handle_ != VK_NULL_HANDLE;
     }

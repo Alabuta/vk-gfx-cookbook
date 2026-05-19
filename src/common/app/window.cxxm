@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <string>
 
 #include <volk.h>
@@ -13,7 +14,7 @@ export namespace vkgc
     {
     public:
 
-        window(std::string const& title, uint32_t width, uint32_t height) noexcept;
+        window(std::string const& title, std::uint32_t width, std::uint32_t height) noexcept;
         ~window();
 
         window(window const&) = delete;
@@ -22,7 +23,7 @@ export namespace vkgc
         window& operator=(window const&) = delete;
         window& operator=(window&& other) = delete;
 
-        [[nodiscard]] explicit operator bool() const noexcept;
+        [[nodiscard]] bool is_valid() const noexcept;
         [[nodiscard]] GLFWwindow* handle() const noexcept;
 
         [[nodiscard]] bool should_close() const noexcept;

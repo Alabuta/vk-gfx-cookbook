@@ -45,7 +45,7 @@ export namespace vkgc
         vulkan_device& operator=(vulkan_device const&) = delete;
         vulkan_device& operator=(vulkan_device&&) = delete;
 
-        [[nodiscard]] explicit operator bool() const noexcept;
+        [[nodiscard]] bool is_valid() const noexcept;
 
         [[nodiscard]] VkPhysicalDevice physical_device() const noexcept;
         [[nodiscard]] VkDevice handle() const noexcept;

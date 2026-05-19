@@ -40,7 +40,7 @@ export namespace vkgc
         vulkan_instance& operator=(vulkan_instance const&) = delete;
         vulkan_instance& operator=(vulkan_instance&&) = delete;
 
-        [[nodiscard]] explicit operator bool() const noexcept;
+        [[nodiscard]] bool is_valid() const noexcept;
         [[nodiscard]] VkInstance handle() const noexcept;
 
         [[nodiscard]] vulkan_surface create_window_surface(window const& w) noexcept;

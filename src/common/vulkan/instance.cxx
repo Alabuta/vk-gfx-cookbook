@@ -217,7 +217,7 @@ namespace vkgc
         handle_ = VK_NULL_HANDLE;
     }
 
-    vulkan_instance::operator bool() const noexcept
+    bool vulkan_instance::is_valid() const noexcept
     {
         return handle_ != VK_NULL_HANDLE;
     }

@@ -7,7 +7,7 @@ int main()
 
     {
         vkgc::window const window{"GLFW example", 1280, 800};
-        if (!window)
+        if (!window.is_valid())
         {
             return -1;
         }

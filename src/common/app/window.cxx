@@ -48,7 +48,7 @@ namespace vkgc
         }
     }
 
-    window::operator bool() const noexcept
+    bool window::is_valid() const noexcept
     {
         return handle_ != nullptr;
     }

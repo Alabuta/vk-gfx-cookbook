@@ -24,7 +24,7 @@ namespace vkgc
         handle_ = VK_NULL_HANDLE;
     }
 
-    vulkan_surface::operator bool() const noexcept
+    bool vulkan_surface::is_valid() const noexcept
     {
         return handle_ != VK_NULL_HANDLE;
     }
