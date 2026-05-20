@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <functional>
 #include <string>
 
 #include <volk.h>
@@ -14,6 +15,33 @@ export namespace vkgc
     {
     public:
 
+        using resize_slot_t = std::function<void(std::uint32_t, std::uint32_t)>;
+
+        class slot_connection
+        {
+        public:
+
+            slot_connection() noexcept;
+            ~slot_connection();
+
+            slot_connection(slot_connection const&) = delete;
+            slot_connection(slot_connection&& other) noexcept;
+
+            slot_connection& operator=(slot_connection const&) = delete;
+            slot_connection& operator=(slot_connection&& other) noexcept;
+
+            void disconnect() noexcept;
+
+        private:
+
+            friend class window;
+            struct connection_state;
+
+            connection_state* state_{nullptr};
+
+            explicit slot_connection(connection_state* state) noexcept;
+        };
+
         window(std::string const& title, std::uint32_t width, std::uint32_t height) noexcept;
         ~window();
 
@@ -23,15 +51,34 @@ export namespace vkgc
         window& operator=(window const&) = delete;
         window& operator=(window&& other) = delete;
 
-        [[nodiscard]] bool is_valid() const noexcept;
-        [[nodiscard]] GLFWwindow* handle() const noexcept;
+        [[nodiscard]]
+        GLFWwindow* handle() const noexcept;
 
-        [[nodiscard]] bool should_close() const noexcept;
+        [[nodiscard]]
+        std::pair<std::uint32_t, std::uint32_t> get_size() const noexcept;
 
-        [[nodiscard]] VkSurfaceKHR create_vulkan_surface(VkInstance instance) const noexcept;
+        [[nodiscard]]
+        bool is_valid() const noexcept;
+
+        [[nodiscard]]
+        bool should_close() const noexcept;
+
+        [[nodiscard]]
+        VkSurfaceKHR get_vulkan_surface(VkInstance instance) const noexcept;
+
+        [[nodiscard]]
+        slot_connection connect_on_resize(resize_slot_t slot);
 
     private:
 
         GLFWwindow* handle_{nullptr};
+        mutable VkSurfaceKHR surface_{VK_NULL_HANDLE};
+
+        std::pair<std::uint32_t, std::uint32_t> size_;
+
+        struct signals;
+        signals* signals_{nullptr};
+
+        void handle_resize_event(std::uint32_t new_width, std::uint32_t new_height);
     };
 }
