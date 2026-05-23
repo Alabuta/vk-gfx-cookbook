@@ -13,8 +13,8 @@ module;
 #include <volk.h>
 #include "vulkan/format.hxx"
 
-#define VMA_IMPLEMENTATION
 #include "assert.hxx"
+
 #include "vk_mem_alloc.h"
 
 #include "GLFW/glfw3.h"

@@ -19,8 +19,11 @@ export namespace vkgc
         vulkan_surface& operator=(vulkan_surface const&) = delete;
         vulkan_surface& operator=(vulkan_surface&&) = delete;
 
-        [[nodiscard]] bool is_valid() const noexcept;
-        [[nodiscard]] VkSurfaceKHR handle() const noexcept;
+        [[nodiscard]]
+        bool is_valid() const noexcept;
+
+        [[nodiscard]]
+        VkSurfaceKHR handle() const noexcept;
 
     private:
 

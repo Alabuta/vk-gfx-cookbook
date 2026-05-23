@@ -76,4 +76,16 @@ FetchContent_Declare(
         FIND_PACKAGE_ARGS
 )
 
-FetchContent_MakeAvailable(volk glm glfw taskflow glslang VulkanMemoryAllocator)
+# === sigslot === (header-only signal/slot library; exposes `Pal::Sigslot`)
+set(SIGSLOT_COMPILE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SIGSLOT_COMPILE_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+        sigslot
+        GIT_REPOSITORY https://github.com/palacaze/sigslot.git
+        GIT_TAG        v1.2.2
+        EXCLUDE_FROM_ALL
+        SYSTEM
+        FIND_PACKAGE_ARGS
+)
+
+FetchContent_MakeAvailable(volk glm glfw taskflow glslang VulkanMemoryAllocator sigslot)

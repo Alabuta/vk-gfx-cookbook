@@ -1,6 +1,7 @@
 module;
 
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <print>
 
@@ -39,16 +40,16 @@ namespace vkgc
         memory_properties_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
         vkGetPhysicalDeviceMemoryProperties2(physical_device_, &memory_properties_);
 
-        auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
+        auto constexpr invalid_queue_family_index = std::numeric_limits<std::uint32_t>::max();
 
         vkGetDeviceQueue(handle_, queue_families_.main, 0, &main_queue_);
 
-        if (queue_families_.dedicated_compute != invalid_family_index)
+        if (queue_families_.dedicated_compute != invalid_queue_family_index)
         {
             vkGetDeviceQueue(handle_, queue_families_.dedicated_compute, 0, &dedicated_compute_queue_);
         }
 
-        if (queue_families_.dedicated_transfer != invalid_family_index)
+        if (queue_families_.dedicated_transfer != invalid_queue_family_index)
         {
             vkGetDeviceQueue(handle_, queue_families_.dedicated_transfer, 0, &dedicated_transfer_queue_);
         }
@@ -59,7 +60,7 @@ namespace vkgc
 
         std::println("[Vulkan] : Log : main queue family index is {}", queue_families_.main);
 
-        if (queue_families_.dedicated_compute != invalid_family_index)
+        if (queue_families_.dedicated_compute != invalid_queue_family_index)
         {
             std::println(
                 "[Vulkan] : Log : dedicated async compute queue family index is {}",
@@ -70,7 +71,7 @@ namespace vkgc
             std::println("[Vulkan] : Log : no dedicated async compute queue; main queue must be used for compute");
         }
 
-        if (queue_families_.dedicated_transfer != invalid_family_index)
+        if (queue_families_.dedicated_transfer != invalid_queue_family_index)
         {
             std::println(
                 "[Vulkan] : Log : dedicated DMA transfer queue family index is {}",
@@ -160,5 +161,27 @@ namespace vkgc
     std::uint32_t vulkan_device::dedicated_transfer_queue_family_index() const noexcept
     {
         return queue_families_.dedicated_transfer;
+    }
+
+    VkResult vulkan_device::set_debug_object_name(VkObjectType type, std::uint64_t handle, char const* name) const
+    {
+#if VKGC_DEBUG_VULKAN
+        if (name == nullptr || std::strlen(name) == 0)
+        {
+            return VK_SUCCESS;
+        }
+
+        VkDebugUtilsObjectNameInfoEXT const name_info{
+            .sType{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT},
+            .pNext{nullptr},
+            .objectType{type},
+            .objectHandle{handle},
+            .pObjectName{name},
+          };
+
+        return vkSetDebugUtilsObjectNameEXT(handle_, &name_info);
+#else
+        return VK_SUCCESS;
+#endif
     }
 }

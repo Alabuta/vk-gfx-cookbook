@@ -229,6 +229,6 @@ namespace vkgc
 
     vulkan_surface vulkan_instance::create_window_surface(window const& w) noexcept
     {
-        return vulkan_surface{handle_, w.create_vulkan_surface(handle_)};
+        return vulkan_surface{handle_, w.get_vulkan_surface(handle_)};
     }
 }

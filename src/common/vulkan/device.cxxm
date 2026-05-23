@@ -64,6 +64,8 @@ export namespace vkgc
         [[nodiscard]] VkQueue dedicated_transfer_queue() const noexcept;
         [[nodiscard]] std::uint32_t dedicated_transfer_queue_family_index() const noexcept;
 
+        VkResult set_debug_object_name(VkObjectType type, std::uint64_t handle, char const* name) const;
+
     private:
 
         VkPhysicalDevice physical_device_{VK_NULL_HANDLE};

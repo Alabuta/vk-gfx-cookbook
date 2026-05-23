@@ -15,15 +15,33 @@ import vkgc.vulkan_object_registry;
 
 export namespace vkgc
 {
-    struct vulkan_swapchain_info
+    struct swapchain_params
     {
-        VkSurfaceKHR surface{VK_NULL_HANDLE};
+        std::vector<VkSurfaceFormatKHR> preferred_surface_formats{};
+        std::vector<VkPresentModeKHR> preferred_present_modes{};
+        VkExtent2D framebuffer_extent{};
+        std::uint32_t min_image_count{0};
+        VkImageUsageFlags image_usage_flags{};
+    };
+
+    struct swapchain_create_info
+    {
         VkExtent2D extent{};
         VkSurfaceFormatKHR surface_format{};
         VkPresentModeKHR present_mode{VK_PRESENT_MODE_FIFO_KHR};
-        VkImageUsageFlags image_usage{};
+        VkImageUsageFlags image_usage_flags{};
         std::uint32_t min_image_count{0};
         VkSurfaceTransformFlagBitsKHR pre_transform{VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR};
+    };
+
+    struct presenter_create_info
+    {
+        VkSurfaceKHR surface{VK_NULL_HANDLE};
+        std::vector<VkSurfaceFormatKHR> preferred_surface_formats{};
+        std::vector<VkPresentModeKHR> preferred_present_modes{};
+        VkExtent2D image_extent{};
+        std::uint32_t min_image_count{0};
+        VkImageUsageFlags image_usage_flags{};
     };
 
     struct swapchain_image_acquire_result
@@ -47,8 +65,9 @@ export namespace vkgc
         vulkan_presenter(
             vulkan_device const& device,
             vulkan_object_registry& object_registry,
-            vulkan_swapchain_info const& info,
-            std::uint32_t frames_in_flight);
+            VkSurfaceKHR surface,
+            std::uint32_t frames_in_flight,
+            swapchain_params const& swapchain_params);
 
         ~vulkan_presenter();
 
@@ -71,7 +90,7 @@ export namespace vkgc
         std::uint32_t image_count() const noexcept;
 
         [[nodiscard]]
-        VkFormat image_format() const noexcept;
+        VkSurfaceFormatKHR surface_format() const noexcept;
 
         [[nodiscard]]
         VkExtent2D extent() const noexcept;
@@ -91,7 +110,21 @@ export namespace vkgc
         // vkDeviceWaitIdle, then destroy the previous swapchain and rebuild
         // (using oldSwapchain). image_acquired_semaphores_ are untouched
         // (sized by frames_in_flight, independent of image_count).
-        void recreate(vulkan_swapchain_info const& info);
+        void recreate_swapchain(
+            VkSurfaceKHR surface,
+            swapchain_params const& swapchain_params);
+
+        // Marks the swapchain as needing rebuild. The next acquire_image()
+        // returns present_status::out_of_date without touching the driver,
+        // so the caller's existing out_of_date recovery path runs.
+        void request_rebuild() noexcept;
+
+        // Test-and-clear of the rebuild flag. Polled before begin_frame()
+        // so the caller can run swapchain-dependent recovery without
+        // entering the frame (begin_frame() resets the slot fence, and
+        // skipping the rest of the frame would leave it unsignaled).
+        [[nodiscard]]
+        bool consume_rebuild_request() noexcept;
 
     private:
 
@@ -99,13 +132,17 @@ export namespace vkgc
         vulkan_object_registry& object_registry_;
 
         VkSwapchainKHR swapchain_handle_{VK_NULL_HANDLE};
-        std::vector<VkImage> images_{};
-        VkFormat image_format_{VK_FORMAT_UNDEFINED};
-        VkExtent2D extent_{};
+
+        VkSurfaceFormatKHR surface_format_{};
+        VkExtent2D surface_extent_{};
+
+        std::vector<VkImage> swapchain_images_{};
 
         std::vector<vk_semaphore_handle> image_acquired_semaphores_{};
 
-        void create_swapchain(vulkan_swapchain_info const& info, VkSwapchainKHR old_handle);
+        bool needs_rebuild_{false};
+
+        void create_swapchain(VkSurfaceKHR surface, VkSwapchainKHR old_handle, swapchain_params const& swapchain_params);
         void query_swapchain_images();
         bool create_image_acquired_semaphores(std::uint32_t count);
         void destroy_image_acquired_semaphores();

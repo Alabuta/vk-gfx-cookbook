@@ -89,8 +89,8 @@ namespace vkgc
 
     std::uint32_t vulkan_frame_ring::begin_frame()
     {
-        VkDevice device_handle = object_registry_.device().handle();
-        VkFence frame_fence = object_registry_.resolve_handle(current_frame_fence());
+        auto const device_handle = object_registry_.device().handle();
+        auto const frame_fence = object_registry_.resolve_handle(current_frame_fence());
 
         if (device_handle != VK_NULL_HANDLE && frame_fence != VK_NULL_HANDLE)
         {

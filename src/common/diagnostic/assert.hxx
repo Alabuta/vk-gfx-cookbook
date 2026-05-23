@@ -84,10 +84,14 @@ namespace vkgc::assert_detail
     }
 }
 
+#ifndef __has_builtin
+    #define __has_builtin(x) 0
+#endif
+
 #if defined(__cpp_lib_debugging)
     import <debugging>;
     #define VKGC_DEBUG_BREAK() std::breakpoint()
-#elif defined(__has_builtin) && __has_builtin(__builtin_debugtrap)
+#elif __has_builtin(__builtin_debugtrap)
     #define VKGC_DEBUG_BREAK() __builtin_debugtrap()
 #elif defined(_MSC_VER)
     #define VKGC_DEBUG_BREAK() __debugbreak()

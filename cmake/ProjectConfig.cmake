@@ -3,10 +3,11 @@ function(configure_cookbook_target TARGET_NAME)
     # Compiler/platform dispatch via generator expressions (evaluated per-target at generation time).
     # Using $<CXX_COMPILER_ID:...> rather than $<COMPILE_LANG_AND_ID:CXX,...> because the latter is
     # only valid for compile properties; CXX_COMPILER_ID works in link-library and link-option contexts too.
-    set(IS_GNU_LINUX "$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Windows>>>")
-    set(IS_MINGW     "$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>")
-    set(IS_CLANG_CL  "$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>")
-    set(IS_MSVC      "$<CXX_COMPILER_ID:MSVC>")
+    set(IS_GNU_LINUX  "$<AND:$<CXX_COMPILER_ID:GNU>,$<NOT:$<PLATFORM_ID:Windows>>>")
+    set(IS_MINGW      "$<AND:$<CXX_COMPILER_ID:GNU>,$<PLATFORM_ID:Windows>>")
+    set(IS_CLANG_CL   "$<AND:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_FRONTEND_VARIANT:MSVC>>")
+    set(IS_CLANG_MSYS "$<AND:$<CXX_COMPILER_ID:Clang>,$<PLATFORM_ID:Windows>,$<CXX_COMPILER_FRONTEND_VARIANT:GNU>>")
+    set(IS_MSVC       "$<CXX_COMPILER_ID:MSVC>")
 
     target_include_directories(${TARGET_NAME}
         PRIVATE
@@ -20,6 +21,7 @@ function(configure_cookbook_target TARGET_NAME)
             ${CMAKE_SOURCE_DIR}/src/common/app/window.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/instance.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/device_creation.cxx
+            ${CMAKE_SOURCE_DIR}/src/common/vulkan/vma_implementation.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/presentation/surface.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/device.cxx
             ${CMAKE_SOURCE_DIR}/src/common/vulkan/device_features.cxx
@@ -51,7 +53,7 @@ function(configure_cookbook_target TARGET_NAME)
 
     target_link_libraries(${TARGET_NAME}
         PRIVATE
-            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
                 stdc++fs
                 stdc++exp
             ">"
@@ -63,6 +65,7 @@ function(configure_cookbook_target TARGET_NAME)
 
             glm::glm
             glfw
+            Pal::Sigslot
             Taskflow::Taskflow
 
             SPIRV
@@ -117,6 +120,8 @@ function(configure_cookbook_target TARGET_NAME)
 
                 GLFW_EXPOSE_NATIVE_WIN32
                 GLFW_NATIVE_INCLUDE_NONE
+
+                NOMINMAX
             ">"
 
             COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"
