@@ -57,6 +57,37 @@ target_compile_options(vkgc_warnings
             -Wno-c++98-compat-pedantic
 
             -Wno-pre-c++17-compat
+
+            # Project is C++23-only; the -Wc++NN-compat family flags C++20+ features
+            # as "won't work in older standards" — pure noise for forward-only code.
+            -Wno-c++20-compat
+
+            # Vulkan-struct designated init (`{.sType{X}}`) deliberately omits pNext and
+            # payload members; C++20 value-initializes them to {} / nullptr so it's
+            # idiomatic and safe. Clang 19+ raises -Wmissing-designated-field-initializers
+            # on every such site, which adds nothing for this codebase. GCC's separate
+            # -Wmissing-field-initializers is still active.
+            -Wno-missing-designated-field-initializers
+
+            # Vulkan enums (VkResult, VkDebugReportObjectType, ...) carry sentinel
+            # *_MAX_ENUM values and grow with every SDK update; enumerating every case
+            # in formatter switches is a treadmill. -Wswitch (no default + missing
+            # cases) is still active, so genuinely-uncovered switches still error out.
+            -Wno-switch-enum
+
+            # Exhaustive switches over project enums (e.g. present_status) deliberately
+            # omit `default:` so that adding a new enumerator triggers -Wswitch on every
+            # call site. -Wswitch-default enforces the opposite preference (always add
+            # a fallback) and would mask exactly the kind of churn we want surfaced.
+            -Wno-switch-default
+
+            # Vulkan payload structs hit -Wpadded because the natural field layout
+            # (pointer-sized handle + 4-byte enum / 1-byte bool / etc.) leaves
+            # unavoidable trailing padding to satisfy 8-byte alignment. Reordering
+            # can't dissolve the padding without filler fields, which is worse than
+            # the diagnostic. The warning is off by default upstream; suppress so
+            # the implicit enable doesn't break us.
+            -Wno-padded
         ">"
 
         "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
@@ -75,6 +106,13 @@ target_compile_options(vkgc_warnings
             -Wno-unknown-warning-option
 
             -Wno-shadow-field-in-constructor
+
+            # CMake's Windows-Clang-CXX module injects `-TP` (force C++) on every CXX
+            # compile rule. For .cxxm module interface units, clang already infers C++
+            # from the extension, so `-TP` is redundant and `-Wunused-command-line-argument`
+            # flags it — fatal under `-Werror`. Suppress project-wide; we don't rely on
+            # this warning to police flag drift.
+            -Wno-unused-command-line-argument
 
             # For CLion's compiler-info probe: it runs clang-cl with -Weverything
             # on a synthetic TU full of reserved identifiers (`___CIDR_*`); without
