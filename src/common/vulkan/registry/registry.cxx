@@ -1,6 +1,7 @@
 module;
 
 #include <algorithm>
+#include <bit>
 #include <cstdint>
 #include <print>
 #include <ranges>
@@ -51,7 +52,7 @@ namespace vkgc
         drain_pool_in_destructor<vk_object_tags::fence>();
     }
 
-    vk_image_handle vulkan_object_registry::create_image(VkImageCreateInfo const& info)
+    vk_image_handle vulkan_object_registry::create_image(VkImageCreateInfo const& info, char const* debug_name)
     {
         VkImage handle{VK_NULL_HANDLE};
         if (auto const result = vkCreateImage(device_.handle(), &info, nullptr, &handle);
@@ -60,6 +61,8 @@ namespace vkgc
             std::println(stderr, "[Vulkan] : Error : failed to create image ({})", result);
             return {};
         }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
         return slot_map<vk_object_tags::image>().insert(image_payload{
             .handle{handle},
@@ -97,7 +100,7 @@ namespace vkgc
         return slot_map<vk_object_tags::allocation>().insert(allocation_payload{.handle{allocation}});
     }
 
-    vk_buffer_handle vulkan_object_registry::create_buffer(VkBufferCreateInfo const& info)
+    vk_buffer_handle vulkan_object_registry::create_buffer(VkBufferCreateInfo const& info, char const* debug_name)
     {
         VkBuffer handle{VK_NULL_HANDLE};
         if (auto const result = vkCreateBuffer(device_.handle(), &info, nullptr, &handle);
@@ -106,6 +109,8 @@ namespace vkgc
             std::println(stderr, "[Vulkan] : Error : failed to create buffer ({})", result);
             return {};
         }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_BUFFER, std::bit_cast<std::uint64_t>(handle), debug_name);
 
         return slot_map<vk_object_tags::buffer>().insert(buffer_payload{
             .handle{handle},
@@ -140,7 +145,9 @@ namespace vkgc
         return slot_map<vk_object_tags::allocation>().insert(allocation_payload{.handle{allocation}});
     }
 
-    vk_image_view_handle vulkan_object_registry::create_image_view(VkImageViewCreateInfo const& info)
+    vk_image_view_handle vulkan_object_registry::create_image_view(
+        VkImageViewCreateInfo const& info,
+        char const* debug_name)
     {
         VkImageView handle{VK_NULL_HANDLE};
         if (auto const result = vkCreateImageView(device_.handle(), &info, nullptr, &handle);
@@ -150,13 +157,15 @@ namespace vkgc
             return {};
         }
 
+        device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE_VIEW, std::bit_cast<std::uint64_t>(handle), debug_name);
+
         return slot_map<vk_object_tags::image_view>().insert(image_view_payload{
             .handle{handle},
             .format{info.format}
         });
     }
 
-    vk_fence_handle vulkan_object_registry::create_fence(VkFenceCreateInfo const& info)
+    vk_fence_handle vulkan_object_registry::create_fence(VkFenceCreateInfo const& info, char const* debug_name)
     {
         VkFence handle{VK_NULL_HANDLE};
         if (auto const result = vkCreateFence(device_.handle(), &info, nullptr, &handle);
@@ -166,10 +175,14 @@ namespace vkgc
             return {};
         }
 
+        device_.set_debug_object_name(VK_OBJECT_TYPE_FENCE, std::bit_cast<std::uint64_t>(handle), debug_name);
+
         return slot_map<vk_object_tags::fence>().insert(fence_payload{.handle{handle}});
     }
 
-    vk_semaphore_handle vulkan_object_registry::create_semaphore(VkSemaphoreCreateInfo const& info)
+    vk_semaphore_handle vulkan_object_registry::create_semaphore(
+        VkSemaphoreCreateInfo const& info,
+        char const* debug_name)
     {
         VkSemaphore handle{VK_NULL_HANDLE};
         if (auto const result = vkCreateSemaphore(device_.handle(), &info, nullptr, &handle);
@@ -179,10 +192,14 @@ namespace vkgc
             return {};
         }
 
+        device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
+
         return slot_map<vk_object_tags::semaphore>().insert(semaphore_payload{.handle{handle}});
     }
 
-    vk_command_pool_handle vulkan_object_registry::command_pool_create(VkCommandPoolCreateInfo const& info)
+    vk_command_pool_handle vulkan_object_registry::create_command_pool(
+        VkCommandPoolCreateInfo const& info,
+        char const* debug_name)
     {
         VkCommandPool handle{VK_NULL_HANDLE};
         if (auto const result = vkCreateCommandPool(device_.handle(), &info, nullptr, &handle);
@@ -191,6 +208,8 @@ namespace vkgc
             std::println(stderr, "[Vulkan] : Error : failed to create command pool ({})", result);
             return {};
         }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_COMMAND_POOL, std::bit_cast<std::uint64_t>(handle), debug_name);
 
         return slot_map<vk_object_tags::command_pool>().insert(command_pool_payload{
             .handle{handle},

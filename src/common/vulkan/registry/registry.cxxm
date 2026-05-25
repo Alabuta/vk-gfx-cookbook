@@ -30,28 +30,28 @@ export namespace vkgc
         vulkan_object_registry& operator=(vulkan_object_registry&&) = delete;
 
         [[nodiscard]]
-        vk_image_handle create_image(VkImageCreateInfo const& info);
+        vk_image_handle create_image(VkImageCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
         vk_allocation_handle allocate_image_memory(vk_image_handle image, VmaAllocationCreateInfo const& alloc_info);
 
         [[nodiscard]]
-        vk_buffer_handle create_buffer(VkBufferCreateInfo const& info);
+        vk_buffer_handle create_buffer(VkBufferCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
         vk_allocation_handle allocate_buffer_memory(vk_buffer_handle buffer, VmaAllocationCreateInfo const& alloc_info);
 
         [[nodiscard]]
-        vk_image_view_handle create_image_view(VkImageViewCreateInfo const& info);
+        vk_image_view_handle create_image_view(VkImageViewCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
-        vk_fence_handle create_fence(VkFenceCreateInfo const& info);
+        vk_fence_handle create_fence(VkFenceCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
-        vk_semaphore_handle create_semaphore(VkSemaphoreCreateInfo const& info);
+        vk_semaphore_handle create_semaphore(VkSemaphoreCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
-        vk_command_pool_handle command_pool_create(VkCommandPoolCreateInfo const& info);
+        vk_command_pool_handle create_command_pool(VkCommandPoolCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
         std::vector<vk_command_buffer_handle> allocate_command_buffers(

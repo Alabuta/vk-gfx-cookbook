@@ -166,11 +166,6 @@ namespace vkgc
     VkResult vulkan_device::set_debug_object_name(VkObjectType type, std::uint64_t handle, char const* name) const
     {
 #if VKGC_DEBUG_VULKAN
-        if (name == nullptr || std::strlen(name) == 0)
-        {
-            return VK_SUCCESS;
-        }
-
         VkDebugUtilsObjectNameInfoEXT const name_info{
             .sType{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT},
             .pNext{nullptr},

@@ -32,7 +32,7 @@ namespace vkgc
 }
 
 [[nodiscard]]
-std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
+static std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
     vkgc::vulkan_object_registry& vk_object_registry,
     std::span<VkImage const> const images,
     VkFormat const format)
@@ -40,7 +40,7 @@ std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
     std::vector<vkgc::vk_image_view_handle> image_view_handles;
     image_view_handles.reserve(images.size());
 
-    for (auto image_handle : images)
+    for (std::uint32_t i{0}; auto image_handle : images)
     {
         VkImageViewCreateInfo const create_info{
             .sType{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO},
@@ -64,7 +64,8 @@ std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
             }
         };
 
-        if (auto const view = vk_object_registry.create_image_view(create_info); view.is_valid())
+        auto const debug_name = std::format("swapchain image [#{}]", i++);
+        if (auto const view = vk_object_registry.create_image_view(create_info, debug_name.c_str()); view.is_valid())
         {
             image_view_handles.push_back(view);
             continue;
@@ -82,8 +83,7 @@ std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
 }
 
 [[nodiscard]]
-bool create_depth_attachment(
-    vkgc::vulkan_device const& vulkan_device,
+static bool create_depth_attachment(
     vkgc::vulkan_object_registry& vk_object_registry,
     VkFormat const image_format,
     VkExtent3D const image_extent,
@@ -109,7 +109,7 @@ bool create_depth_attachment(
         .initialLayout{VK_IMAGE_LAYOUT_UNDEFINED}
     };
 
-    image = vk_object_registry.create_image(image_create_info);
+    image = vk_object_registry.create_image(image_create_info, "depth attachment image");
     if (!image.is_valid())
     {
         return false;
@@ -162,7 +162,7 @@ bool create_depth_attachment(
         }
     };
 
-    image_view = vk_object_registry.create_image_view(depth_view_create_info);
+    image_view = vk_object_registry.create_image_view(depth_view_create_info, "depth attachment image view");
     if (!image_view.is_valid())
     {
         vk_object_registry.destroy_immediate(image_view);
@@ -171,20 +171,10 @@ bool create_depth_attachment(
         return false;
     }
 
-    vulkan_device.set_debug_object_name(
-        VK_OBJECT_TYPE_IMAGE,
-        std::bit_cast<std::uint64_t>(vk_object_registry.resolve_handle(image)),
-        "depth attachment image");
-
-    vulkan_device.set_debug_object_name(
-        VK_OBJECT_TYPE_IMAGE_VIEW,
-        std::bit_cast<std::uint64_t>(vk_object_registry.resolve_handle(image_view)),
-        "depth attachment image view");
-
     return true;
 }
 
-bool run_app(std::uint32_t width, std::uint32_t height)
+static bool run_app(std::uint32_t width, std::uint32_t height)
 {
     vkgc::vulkan_instance vulkan_instance{{ .enable_validation{true} }};
     VKGC_VERIFY(vulkan_instance.is_valid());
@@ -268,7 +258,8 @@ bool run_app(std::uint32_t width, std::uint32_t height)
 
         for (std::uint32_t i = 0; i < presenter.image_count(); ++i)
         {
-            auto const semaphore = vk_object_registry.create_semaphore(semaphore_create_info);
+            auto const debug_name = std::format("frame execution complete semaphore [#{}]", i++);
+            auto const semaphore = vk_object_registry.create_semaphore(semaphore_create_info, debug_name.c_str());
             if (!semaphore.is_valid())
             {
                 return false;
@@ -278,7 +269,7 @@ bool run_app(std::uint32_t width, std::uint32_t height)
         }
     }
 
-    auto const main_queue_command_pool = vk_object_registry.command_pool_create({
+    auto const main_queue_command_pool = vk_object_registry.create_command_pool({
         .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
         .pNext{nullptr},
         .flags{VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT},
@@ -329,7 +320,6 @@ bool run_app(std::uint32_t width, std::uint32_t height)
     vkgc::vk_image_view_handle depth_attachment_image_view;
 
     if (!create_depth_attachment(
-        vulkan_device,
         vk_object_registry,
         depth_attachment_format,
         {.width{swapchain_image_extent.width}, .height{swapchain_image_extent.height}, .depth{1}},
@@ -375,7 +365,6 @@ bool run_app(std::uint32_t width, std::uint32_t height)
         }
 
         if (!create_depth_attachment(
-            vulkan_device,
             vk_object_registry,
             depth_attachment_format,
             {.width{swapchain_image_extent.width}, .height{swapchain_image_extent.height}, .depth{1}},
@@ -536,7 +525,7 @@ bool run_app(std::uint32_t width, std::uint32_t height)
                 .pMemoryBarriers{nullptr},
                 .bufferMemoryBarrierCount{0},
                 .pBufferMemoryBarriers{nullptr},
-                .imageMemoryBarrierCount{images_transition_barriers.size()},
+                .imageMemoryBarrierCount{static_cast<std::uint32_t>(images_transition_barriers.size())},
                 .pImageMemoryBarriers{images_transition_barriers.data()},
             };
 
@@ -621,6 +610,7 @@ bool run_app(std::uint32_t width, std::uint32_t height)
             break;
 
         case vkgc::present_status::suboptimal:
+            [[fallthrough]];
         case vkgc::present_status::out_of_date:
             if (!rebuild_swapchain_resources())
             {
