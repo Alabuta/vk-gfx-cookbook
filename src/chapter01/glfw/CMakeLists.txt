@@ -1,5 +1,6 @@
 add_executable(chapter01_glfw main.cxx)
 
+vkgc_configure_chapter_target(chapter01_glfw)
 vkgc_attach_common_sources(chapter01_glfw)
 
 target_link_libraries(chapter01_glfw

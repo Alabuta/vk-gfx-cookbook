@@ -27,7 +27,6 @@ endif()
 # chapter executables (and FetchContent libs, where they're inert) inherit without per-target
 # boilerplate.
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_DEBUG_POSTFIX .dbg)
 set(CMAKE_VS_DEBUGGER_WORKING_DIRECTORY "$<$<PLATFORM_ID:Windows>:${CMAKE_SOURCE_DIR}>")
 set(CMAKE_XCODE_GENERATE_SCHEME TRUE)
 set(CMAKE_XCODE_SCHEME_WORKING_DIRECTORY "$<$<PLATFORM_ID:Darwin>:${CMAKE_SOURCE_DIR}>")

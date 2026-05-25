@@ -1,5 +1,6 @@
 add_executable(chapter01_taskflow main.cxx)
 
+vkgc_configure_chapter_target(chapter01_taskflow)
 vkgc_attach_common_sources(chapter01_taskflow)
 
 target_link_libraries(chapter01_taskflow

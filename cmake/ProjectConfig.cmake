@@ -1,9 +1,21 @@
-# Common-source attachment helper (transitional).
+# Per-chapter configuration helpers.
 #
-# Phase A keeps the shared sources under src/common/ as TU-level sources attached to each chapter
-# executable. Phase B will extract them to a real vkgc::common OBJECT/STATIC library; the call
-# sites become `target_link_libraries(<target> PRIVATE vkgc::common)` and this helper goes away.
-# Until then this is the one piece of build configuration each chapter still invokes by name.
+# `vkgc_configure_chapter_target` sets non-transitive target properties that can't be carried by
+# INTERFACE libraries and don't inherit from the corresponding CMAKE_* variables for executables
+# (e.g. DEBUG_POSTFIX, which CMAKE_<CONFIG>_POSTFIX only initializes on non-executable targets).
+#
+# `vkgc_attach_common_sources` is transitional: Phase A keeps the shared sources under src/common/
+# as TU-level sources attached to each chapter executable; Phase B will extract them to a real
+# vkgc::common OBJECT/STATIC library and the call sites become
+# `target_link_libraries(<target> PRIVATE vkgc::common)`.
+
+function(vkgc_configure_chapter_target TARGET_NAME)
+
+    set_target_properties(${TARGET_NAME} PROPERTIES
+        DEBUG_POSTFIX .dbg
+    )
+
+endfunction()
 
 function(vkgc_attach_common_sources TARGET_NAME)
 

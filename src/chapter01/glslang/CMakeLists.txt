@@ -1,5 +1,6 @@
 add_executable(chapter01_glslang main.cxx)
 
+vkgc_configure_chapter_target(chapter01_glslang)
 vkgc_attach_common_sources(chapter01_glslang)
 
 target_link_libraries(chapter01_glslang
