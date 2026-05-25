@@ -35,37 +35,57 @@ cmake --build build --target chapter01_glfw
 
 ## Architecture
 
-- `chapters/chapterNN/<topic>/` — each chapter exercise is a self-contained CMake sub-project with its own `CMakeLists.txt` and `src/main.cxx`
-- `shaders/chapterNN/<topic>/` — GLSL sources consumed by chapter targets at runtime; located via the `COOKBOOK_SHADER_DIR_STRING` compile define injected by `configure_cookbook_target()`
-- `.cache/` — runtime output for compiled SPIR-V and other generated artifacts; located via `COOKBOOK_CACHE_DIR_STRING` and gitignored
-- `cmake/CookbookConfig.cmake` — shared `configure_cookbook_target()` function applied to all chapter targets
-- Root `CMakeLists.txt` — project-wide settings, dependency declarations, compiler detection, and chapter subdirectory includes
-- Chapter CMakeLists files are minimal; they define the executable target and source, then call `configure_cookbook_target()`
+- `src/chapterNN/<topic>/` — each chapter exercise is a self-contained CMake sub-project with its own `CMakeLists.txt` and `main.cxx`
+- `src/common/` — shared sources and C++23 module units (`app/`, `platform/`, `vulkan/`) attached to every chapter executable via `vkgc_attach_common_sources()`; transitional pending extraction into a real `vkgc::common` library
+- `shaders/chapterNN/<topic>/` — GLSL sources consumed by chapter targets at runtime; located via the `COOKBOOK_SHADER_DIR_STRING` compile define carried by `vkgc::config::cookbook_paths`
+- `.cache/` — runtime output for compiled SPIR-V and other generated artifacts; located via `COOKBOOK_CACHE_DIR_STRING` (same source); gitignored
+- Root `CMakeLists.txt` — toolchain-shaping invariants, non-transitive target-property defaults, and `include()`s for the modules below
+- `cmake/CompilerDispatch.cmake` — `IS_*` generator-expression aliases (`IS_GNU_LINUX`, `IS_MINGW`, `IS_CLANG_MSYS`, `IS_CLANG_CL`, `IS_MSVC`) consumed by every policy/interface target
+- `cmake/Dependencies.cmake` — `FetchContent_Declare` for all third-party libs
+- `cmake/Policies.cmake` — `vkgc::cxx_runtime`, `vkgc::warnings`, `vkgc::hardening`, `vkgc::no_exceptions`, `vkgc::diagnostics`, `vkgc::platform_quirks` INTERFACE targets
+- `cmake/Interfaces.cmake` — `vkgc::dependencies::*` (vulkan, windowing, math, concurrency, shaders, stdcxx_extras) and `vkgc::config::cookbook_paths` INTERFACE targets
+- `cmake/ProjectConfig.cmake` — per-chapter helpers `vkgc_configure_chapter_target()` (sets `DEBUG_POSTFIX`) and `vkgc_attach_common_sources()` (attaches common TUs + module units)
+- Chapter `CMakeLists.txt` files are minimal: define the executable, call `vkgc_configure_chapter_target()` and `vkgc_attach_common_sources()`, then `target_link_libraries` against the `vkgc::*` targets they need
 
 ## Dependencies
 
 | Library | Version | Source |
 |---------|---------|--------|
+| Vulkan SDK | required | `find_package(Vulkan)` — version from `COOKBOOK_VULKAN_API_VERSION_*` |
+| volk | 1.4.304 | FetchContent (GitHub) — Vulkan function loader |
+| VulkanMemoryAllocator | 3.3.0 | FetchContent (GitHub) — exposes `GPUOpen::VulkanMemoryAllocator` |
 | GLFW | 3.4 | FetchContent (GitHub) |
 | GLM | 1.0.2 | FetchContent (GitHub) |
 | Taskflow | 4.0.0 | FetchContent (GitHub) |
+| sigslot | 1.2.2 | FetchContent (GitHub) — exposes `Pal::Sigslot` |
 | glslang | 16.2.0 | FetchContent (GitHub) — `ENABLE_OPT=OFF` to skip the SPIRV-Tools bootstrap |
-| LightweightVK | 1.4.0 | FetchContent (GitHub) — temporarily disabled while glslang is wired up directly |
 | X11 | system | Required on Linux only |
 
 ## Compiler Configuration
 
-Warnings are treated as errors (`-Werror` / MSVC equivalents). `cmake/CookbookConfig.cmake` defines comprehensive warning flags for four compiler families:
-- **GNU/MinGW**: `-Wall -Wextra -Werror -Wpedantic -Wconversion` plus many specific warnings
-- **Clang-cl**: `/EHa` with clang-specific warning suppressions
-- **MSVC**: Individual `/wNNNNN` warning enables instead of `/W4 /WX`
+Warnings are treated as errors (`-Werror` / `/WX`). `cmake/Interfaces.cmake` defines `vkgc::warnings`, dispatched via the `IS_*` generator-expression aliases in `cmake/CompilerDispatch.cmake` (`IS_GNU_LINUX`, `IS_MINGW`, `IS_CLANG_MSYS`, `IS_CLANG_CL`, `IS_MSVC`):
 
-Platform detection uses `CXX_FLAGS_STYLE_*` variables and CMake generator expressions.
+- **GNU-driver compilers** (GCC + MinGW + Clang-MSYS + Clang-cl — "bilingual"): shared base of `-Wpedantic -Wall -Wextra -Werror -Wconversion` plus the usual quality block (`-Wold-style-cast`, `-Wsign-conversion`, `-Wnull-dereference`, `-Wformat=2`, …) with selective `-Wno-*` opt-outs
+- **GCC family only** (GNU + MinGW): additional GCC-only warnings (`-Wduplicated-cond`, `-Wduplicated-branches`, `-Wlogical-op`, `-Wuseless-cast`) plus `-pipe` / `-fasynchronous-unwind-tables`
+- **Clang-cl**: extra `-Wno-*` suppressions that keep the CLion compiler-info probe happy under `-Weverything`
+- **MSVC native**: `/W4 /WX` plus per-warning `/wNNNNN` opt-ins for specific narrowing/conversion/lifetime issues
+
+Exception model and codegen flags are factored out into their own INTERFACE targets (`vkgc::no_exceptions`, `vkgc::hardening`) rather than living alongside the warning flags.
+
+## Delegation
+
+- **Codebase reconnaissance** — prefer `Agent(subagent_type: "scout", ...)` over inline `Glob`/`Grep` when (a) the search needs ≥3 queries, (b) you're scanning unknown territory ("where does the swapchain rebuild happen?"), or (c) results would dump >50 lines of raw matches into the main context. For single targeted lookups (one file, one symbol), keep using `Grep`/`Read` directly — delegation has its own overhead.
+- **Scout vs. Explore** — `scout` (Haiku, citation-only contract) for cheap location work; reserve the built-in `Explore` for broader read-with-judgment passes that need a stronger model.
+- **Never delegate understanding to scout.** It reports `path:line` citations; you Read and reason. Don't write prompts like "scout this and then fix the bug" — pull the citations back, then decide.
+- **Commit grouping** — when the working tree has accumulated multiple unrelated-ish changes that need to land as separate commits, call `Agent(subagent_type: "committer", ...)` in plan mode first. Show the returned plan to the user for approval (it's their git history), then re-invoke with `mode: execute` and the approved plan pasted back. Skip the agent for trivial single-theme commits — just run `git add` / `git commit` inline.
+- **Never let committer decide whether to commit.** The agent plans and executes; the user approves the plan in between. Don't chain plan→execute in one parent turn without user confirmation.
+- **Build error triage** — after a failed local build, call `Agent(subagent_type: "build-doctor", log: "<path>")` rather than reading the raw log yourself. The agent dedupes `-Werror` cascades, template-instantiation chains, and ninja `FAILED:` noise, then returns ranked `path:line — code — message` citations. Pass `filter` to narrow (e.g., `filter: "configure"`, `filter: "chapter02_swapchain"`). You then Read the cited source and decide on fixes — the agent never proposes them. Skip the agent for one-shot errors visible in <20 lines of log; just read directly.
+- **Never auto-build from the harness.** `build-doctor` consumes logs only — it does not run cmake or ninja. The user builds locally and gives you the log path. Same applies to any future build-related agent.
 
 ## Conventions
 
 - Source file extension: `.cxx`
 - C++ standard: C++23 (`CXX_STANDARD 23`, extensions off)
 - Uses `std::print` (C++23 `<print>` header) instead of `iostream`
-- Debug builds get `.d` suffix on binaries
+- Debug builds get `.dbg` suffix on binaries
 - Target naming: `chapterNN_<topic>` (e.g., `chapter01_glfw`)
