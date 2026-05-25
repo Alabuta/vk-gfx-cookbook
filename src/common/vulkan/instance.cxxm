@@ -16,7 +16,7 @@ import vkgc.vulkan_device;
 
 export namespace vkgc
 {
-    std::uint32_t constexpr kVulkanApiVersion{
+    std::uint32_t inline constexpr kVulkanApiVersion{
         VK_MAKE_API_VERSION(0, COOKBOOK_VULKAN_API_VERSION_MAJOR, COOKBOOK_VULKAN_API_VERSION_MINOR, 0)
     };
 

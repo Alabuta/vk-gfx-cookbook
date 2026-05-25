@@ -107,7 +107,6 @@ export namespace vkgc
             Payload result{slot->payload};
 
             std::destroy_at(&slot->payload);
-
             std::construct_at(&slot->next_free, head_free_);
             head_free_ = handle.index;
             slot->generation = 0;

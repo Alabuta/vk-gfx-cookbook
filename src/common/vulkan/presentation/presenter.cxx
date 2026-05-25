@@ -279,7 +279,7 @@ namespace vkgc
 
     std::span<VkImage const> vulkan_presenter::images() const noexcept
     {
-        return std::span{swapchain_images_.data(), swapchain_images_.size()};
+        return std::span{swapchain_images_};
     }
 
     std::uint32_t vulkan_presenter::image_count() const noexcept
