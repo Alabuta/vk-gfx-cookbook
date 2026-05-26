@@ -67,6 +67,7 @@ namespace
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
             std::println(stderr, "[Vulkan] : Error : [#{}:{}] {}", id, id_name, message);
+            VKGC_DEBUG_BREAK();
         }
         else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
         {

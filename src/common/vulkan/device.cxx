@@ -163,7 +163,10 @@ namespace vkgc
         return queue_families_.dedicated_transfer;
     }
 
-    VkResult vulkan_device::set_debug_object_name(VkObjectType type, std::uint64_t handle, char const* name) const
+    VkResult vulkan_device::set_debug_object_name(
+        [[maybe_unused]] VkObjectType type,
+        [[maybe_unused]] std::uint64_t handle,
+        [[maybe_unused]] char const* name) const
     {
 #if VKGC_DEBUG_VULKAN
         VkDebugUtilsObjectNameInfoEXT const name_info{
