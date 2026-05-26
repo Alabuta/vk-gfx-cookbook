@@ -9,6 +9,7 @@ target_link_libraries(chapter02_swapchain
         vkgc::warnings
         vkgc::hardening
         vkgc::no_exceptions
+        vkgc::sanitizers::address
         vkgc::diagnostics
         vkgc::platform_quirks
 

@@ -111,19 +111,41 @@ target_link_libraries(vkgc_dependencies_shaders
 
 
 # === vkgc::dependencies::stdcxx_extras ===
-# libstdc++ filesystem and experimental TS link libs. GCC and clang-with-libstdc++ need these
-# linked explicitly for std::filesystem and certain <experimental/*> components. Inert on
-# MSVC-STL toolchains (clang-cl + MSVC).
+# libstdc++ filesystem and experimental TS link libs. Inert on MSVC-STL toolchains (clang-cl +
+# MSVC). On libstdc++ toolchains (GCC/MinGW/Clang-MSYS):
+#   * stdc++fs has been a no-op since GCC 9 (filesystem in main libstdc++) — kept for older
+#     toolchains where the archive still carries the relevant symbols.
+#   * stdc++exp carries the C++23 <print>/<stacktrace> runtime in current libstdc++. Whether
+#     a given libstdc++ packaging has those symbols in the main library or in exp varies by
+#     version and distro, so probe by linking std::println — only add stdc++exp when the
+#     default link fails. This auto-corrects if a future libstdc++ moves them into the main
+#     library, where adding -lstdc++exp on top would produce duplicate-symbol errors.
+#
+# The probe is gated to libstdc++ toolchains (it's irrelevant for MSVC-STL) and forces -std=c++23
+# so std::println is visible — without that, CheckCXXSourceCompiles defaults to the compiler's
+# baseline (typically -std=c++17 or -std=gnu++20) and the probe would fail for the wrong reason.
+
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+   OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+       AND "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xGNU"))
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_FLAGS_SAVED "${CMAKE_REQUIRED_FLAGS}")
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -std=c++23")
+    check_cxx_source_compiles([[
+        #include <print>
+        int main() { std::println("probe"); }
+    ]] VKGC_LIBSTDCXX_PRINT_SELF_CONTAINED)
+    set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS_SAVED}")
+    unset(CMAKE_REQUIRED_FLAGS_SAVED)
+endif()
 
 add_library(vkgc_dependencies_stdcxx_extras INTERFACE)
 add_library(vkgc::dependencies::stdcxx_extras ALIAS vkgc_dependencies_stdcxx_extras)
 
 target_link_libraries(vkgc_dependencies_stdcxx_extras
     INTERFACE
-        "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
-            stdc++fs
-            stdc++exp
-        ">"
+        "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:stdc++fs>"
+        "$<$<AND:$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>,$<NOT:$<BOOL:${VKGC_LIBSTDCXX_PRINT_SELF_CONTAINED}>>>:stdc++exp>"
 )
 
 

@@ -22,16 +22,53 @@ Implementations following **"Vulkan 3D Graphics Rendering Cookbook — Second Ed
 
 ## Build System
 
-CMake 3.30+ with Ninja generator. Dependencies fetched via `FetchContent` (no manual installs needed except system-level X11 on Linux).
+CMake 3.30+ with the single-config `Ninja` generator. Dependencies fetched via `FetchContent` (no manual installs needed except system-level X11 on Linux). `CMakePresets.json` ships six visible configure presets — `Debug`, `Development`, `Shipping`, `Debug ASan`, `Development ASan`, `Shipping ASan` — plus a hidden `_base`. Each preset pins `CMAKE_BUILD_TYPE` (Debug / RelWithDebInfo / Release) and `VKGC_ENABLE_ASAN`; none pin a compiler. Compiler choice is the developer's, applied externally (env, CLI, or `CMakeUserPresets.json`). No `buildPresets` section — single-config makes them redundant, and dropping them keeps CLion's profile names clean (CLion uses the configure preset's `name` field directly).
+
+Preset names contain spaces so the CLion profile UI shows them verbatim; quote them on the CLI (`cmake --preset "Debug ASan"`). Build directories follow the same names (`build/Debug ASan/` etc.) — same quoting rule applies.
+
+### Compiler selection
+
+`CMakePresets.json` doesn't set `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER`. Pick one of:
+
+1. **Environment** — launch the configure from a shell where your toolchain is on PATH (vcvars64 for `cl` / `clang-cl`; MSYS2 UCRT64 for `g++` / `clang++`; system shell on Linux). CMake autodetects.
+2. **`CC` / `CXX` env vars** — `CXX=clang-cl cmake --preset Debug`.
+3. **`CMakeUserPresets.json`** (local, gitignored) — define a hidden compiler-base and multi-inherit it alongside the committed build-type presets:
+   ```json
+   {
+       "version": 6,
+       "configurePresets": [
+           { "name": "_msvc",     "hidden": true, "cacheVariables": { "CMAKE_C_COMPILER": "cl",       "CMAKE_CXX_COMPILER": "cl" } },
+           { "name": "_clang-cl", "hidden": true, "cacheVariables": { "CMAKE_C_COMPILER": "clang-cl", "CMAKE_CXX_COMPILER": "clang-cl" } },
+
+           { "name": "MSVC Debug",             "inherits": ["_msvc", "Debug"] },
+           { "name": "MSVC Development",       "inherits": ["_msvc", "Development"] },
+           { "name": "MSVC Shipping",          "inherits": ["_msvc", "Shipping"] },
+           { "name": "MSVC Debug ASan",        "inherits": ["_msvc", "Debug ASan"] },
+           { "name": "MSVC Development ASan",  "inherits": ["_msvc", "Development ASan"] },
+           { "name": "MSVC Shipping ASan",     "inherits": ["_msvc", "Shipping ASan"] }
+       ]
+   }
+   ```
+   Each named variant gets its own `build/<name>/` via the inherited `${presetName}` binaryDir.
+4. **CLI override** — `cmake --preset Debug -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl`.
+
+### Usage
 
 ```bash
-# Configure and build (from project root)
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-cmake --build build
+# Configure (each preset gets its own build/<name>/ dir; quote names with spaces):
+cmake --preset Debug
+cmake --preset "Development ASan"
 
-# Build a specific chapter target
-cmake --build build --target chapter01_glfw
+# Build (single-config — no --preset for build; just point ninja at the build dir):
+cmake --build build/Debug
+cmake --build build/Debug --target chapter01_glfw
+cmake --build "build/Development ASan" --target chapter02_swapchain
+
+# Discover:
+cmake --list-presets configure
 ```
+
+For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCMAKE_BUILD_TYPE=Debug [-DVKGC_ENABLE_ASAN=ON]` still works.
 
 ## Architecture
 

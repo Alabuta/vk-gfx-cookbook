@@ -151,7 +151,9 @@ target_compile_options(vkgc_warnings
 
 # === vkgc::hardening ===
 # Link-time hardening: detect underlinking, disable lazy binding, enforce read-only-after-relocation.
-# Linux/Darwin/MinGW/Clang-MSYS only — MSVC link.exe doesn't accept these.
+# ELF-only concepts — PE/COFF (Windows) already requires every import to be resolved against an
+# import library at link time, so MinGW/Clang-MSYS need nothing here. MSVC link.exe wouldn't accept
+# these spellings anyway.
 
 add_library(vkgc_hardening INTERFACE)
 add_library(vkgc::hardening ALIAS vkgc_hardening)
@@ -159,7 +161,7 @@ add_library(vkgc::hardening ALIAS vkgc_hardening)
 target_link_options(vkgc_hardening
     INTERFACE
         "$<$<PLATFORM_ID:Linux>:"
-            LINKER:-z,defs                          # Detect and reject underlinking
+            LINKER:-z,defs                          # Detect and reject underlinking (== --no-undefined)
             LINKER:-z,now                           # Disable lazy binding
             LINKER:-z,relro                         # Read-only segments after relocation
         ">"
@@ -167,21 +169,23 @@ target_link_options(vkgc_hardening
         "$<$<PLATFORM_ID:Darwin>:"
             LINKER:-bind_at_load                    # Disable lazy binding
         ">"
-
-        "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
-            LINKER:-no-undefined                    # Report unresolved symbol references from regular object files
-            LINKER:-no-allow-shlib-undefined        # Disallows undefined symbols in shared libraries
-            LINKER:-unresolved-symbols=report-all
-        ">"
 )
 
 
 # === vkgc::no_exceptions ===
 # Disable C++ exceptions. clang-cl rejects -fno-exceptions (-Wunknown-argument, fatal under
 # -Werror) and follows MSVC convention; everything else takes the GNU-driver spelling.
-# `_HAS_EXCEPTIONS=0` routes MSVC-STL throw expressions through std::terminate() and removes
-# APIs like vector::at() — required because MSVC STL still contains throw statements even with
-# /EHs-c-.
+#
+# `_HAS_EXCEPTIONS=0` on MSVC / clang-cl is a best-effort cover, not airtight. It rewrites the
+# inline `_THROW(...)` macro to terminate and adds `_Doraise()` overrides on the std exception
+# classes, so throws written directly into STL headers redirect through std::terminate. It does
+# NOT remove APIs like `vector::at()` and does NOT recompile the runtime: out-of-line throw
+# helpers (`_Xout_of_range`, `_Xlength_error`, `_Xbad_alloc`, …) are declared `_CRTIMP2_PURE`
+# in <xutility> and live in msvcp140.dll, which ships built with exceptions enabled. Calling
+# `vector::at()` out of range still hits a real `throw out_of_range` inside the DLL; with
+# /EHs-c- the user frames carry no unwind tables, so the throw rides through to std::terminate
+# instead of being catchable. Treat throwing STL accessors (`at`, `map::at`, `stoi`/`stoX`, …)
+# as effectively banned in this project rather than relying on this target to neutralize them.
 
 add_library(vkgc_no_exceptions INTERFACE)
 add_library(vkgc::no_exceptions ALIAS vkgc_no_exceptions)
@@ -216,10 +220,71 @@ add_library(vkgc::diagnostics ALIAS vkgc_diagnostics)
 target_compile_definitions(vkgc_diagnostics
     INTERFACE
         VKGC_DO_ENSURE=1
-        VKGC_DO_CHECK=$<IF:$<CONFIG:Debug>,1,0>
+        VKGC_DO_CHECK=$<IF:$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>,1,0>
 
-        VKGC_DEBUG_VULKAN=$<IF:$<CONFIG:Debug>,1,0>
+        VKGC_DEBUG_VULKAN=$<IF:$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>,1,0>
 )
+
+
+# === vkgc::sanitizers::address ===
+# AddressSanitizer (compile + link). Gated by VKGC_ENABLE_ASAN; when OFF this target is empty
+# and inert, so chapters can link it unconditionally. -fno-omit-frame-pointer keeps ASan stack
+# traces useful on the GNU-driver side. MSVC-style frontends use /fsanitize=address and require
+# /INCREMENTAL:NO at link (CMake injects /INCREMENTAL into CMAKE_EXE_LINKER_FLAGS_DEBUG); /RTC1
+# stripping for Debug is handled in the root CMakeLists.txt where the flag string lives.
+#
+# Composition notes: combines with vkgc::no_exceptions (/EHs-c- + _HAS_EXCEPTIONS=0 stay valid
+# under ASan) and with vkgc::hardening (ASan's runtime resolves its own symbols, so -z,defs and
+# -no-undefined do not flag false positives on the injected interceptors).
+
+add_library(vkgc_sanitizers_address INTERFACE)
+add_library(vkgc::sanitizers::address ALIAS vkgc_sanitizers_address)
+
+if (VKGC_ENABLE_ASAN)
+    target_compile_options(vkgc_sanitizers_address
+        INTERFACE
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
+                -fsanitize=address
+                -fno-omit-frame-pointer
+            ">"
+
+            "$<$<OR:${IS_MSVC},${IS_CLANG_CL}>:"
+                /fsanitize=address
+            ">"
+    )
+
+    target_link_options(vkgc_sanitizers_address
+        INTERFACE
+            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
+                -fsanitize=address
+            ">"
+
+            "$<$<OR:${IS_MSVC},${IS_CLANG_CL}>:"
+                /INCREMENTAL:NO
+            ">"
+    )
+
+    # clang-cl embeds /defaultlib:clang_rt.asan_*.lib pragmas into instrumented objects and
+    # normally relies on the clang-cl driver to inject -libpath:<resource>/lib/windows at
+    # link time. CMake invokes lld-link.exe directly through vs_link_exe (no driver), so the
+    # path never reaches the linker and the symbols come back undefined. Add the compiler-rt
+    # lib directory to the search path ourselves. Native MSVC ships compiler-rt alongside the
+    # toolset on the default LIB so this isn't needed there; clang-MSYS uses the GNU driver
+    # which auto-resolves its runtime on the GCC-style link line.
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+        execute_process(
+            COMMAND ${CMAKE_CXX_COMPILER} -print-resource-dir
+            OUTPUT_VARIABLE _vkgc_clang_resource_dir
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            COMMAND_ERROR_IS_FATAL ANY
+        )
+        target_link_directories(vkgc_sanitizers_address
+            INTERFACE "${_vkgc_clang_resource_dir}/lib/windows"
+        )
+        unset(_vkgc_clang_resource_dir)
+    endif()
+endif()
 
 
 # === vkgc::platform_quirks ===

@@ -1,0 +1,66 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 30
+    },
+    "configurePresets": [
+        {
+            "name": "_base",
+            "hidden": true,
+            "description": "Inheritance base. Single-config Ninja; compiler NOT pinned. binaryDir = build/${presetName} so each inheriting preset gets its own dir. Inherit from this in CMakeUserPresets.json to pin a compiler.",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}"
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug",
+            "inherits": "_base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "development",
+            "displayName": "Development",
+            "inherits": "_base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+        {
+            "name": "shipping",
+            "displayName": "Shipping",
+            "inherits": "_base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "_asan",
+            "hidden": true,
+            "description": "AddressSanitizer mixin. Combine with a build-type preset (debug/development/shipping). On Windows hosts requires an MSVC-style compiler (MSVC or clang-cl) — the configure refuses MinGW GCC and Clang-MSYS because their GNU-driver builds have no working asan runtime against MSYS2/UCRT64. WSL targets Linux and is unrestricted.",
+            "cacheVariables": {
+                "VKGC_ENABLE_ASAN": "ON"
+            }
+        },
+        {
+            "name": "debug-asan",
+            "displayName": "Debug ASan",
+            "description": "Debug + AddressSanitizer. See _asan for the Windows toolchain constraint.",
+            "inherits": ["_asan", "debug"]
+        },
+        {
+            "name": "development-asan",
+            "displayName": "Development ASan",
+            "description": "Development (RelWithDebInfo) + AddressSanitizer. See _asan for the Windows toolchain constraint.",
+            "inherits": ["_asan", "development"]
+        },
+        {
+            "name": "shipping-asan",
+            "displayName": "Shipping ASan",
+            "description": "Shipping (Release) + AddressSanitizer. See _asan for the Windows toolchain constraint.",
+            "inherits": ["_asan", "shipping"]
+        }
+    ]
+}

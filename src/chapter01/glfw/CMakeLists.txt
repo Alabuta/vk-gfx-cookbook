@@ -9,6 +9,7 @@ target_link_libraries(chapter01_glfw
         vkgc::warnings
         vkgc::hardening
         vkgc::no_exceptions
+        vkgc::sanitizers::address
         vkgc::diagnostics
         vkgc::platform_quirks
 

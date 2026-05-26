@@ -10,6 +10,9 @@ cmake_install.cmake
 CTestTestfile.cmake
 _deps/
 
+# === CMake local preset overrides (per-developer; CMakePresets.json is committed) ===
+CMakeUserPresets.json
+
 # === Compiled binaries ===
 *.exe
 *.out
