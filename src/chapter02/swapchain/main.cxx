@@ -258,21 +258,21 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         for (std::uint32_t i = 0; i < presenter.image_count(); ++i)
         {
-            auto const debug_name = std::format("frame execution complete semaphore [#{}]", i++);
-            auto const semaphore = vk_object_registry.create_semaphore(semaphore_create_info, debug_name.c_str());
-            if (!semaphore.is_valid())
+            auto const debug_name = std::format("frame execution complete semaphore [#{}]", i);
+            if (auto const semaphore = vk_object_registry.create_semaphore(semaphore_create_info, debug_name.c_str());
+                semaphore.is_valid())
             {
-                return false;
+                execution_complete_semaphores.push_back(semaphore);
             }
-
-            execution_complete_semaphores.push_back(semaphore);
         }
+
+        VKGC_VERIFY(presenter.image_count() == execution_complete_semaphores.size());
     }
 
     auto const main_queue_command_pool = vk_object_registry.create_command_pool({
         .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
         .pNext{nullptr},
-        .flags{VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT},
+        .flags{VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT},
         .queueFamilyIndex{vulkan_device.main_queue_family_index()}
     });
     if (!main_queue_command_pool.is_valid())
@@ -327,7 +327,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         depth_attachment_image_memory,
         depth_attachment_image_view))
     {
-        std::println(stderr, "[Vulkan] : Error : failed to crate depth attachment");
+        std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
         return false;
     }
 
@@ -338,7 +338,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return true;
         }
 
-        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(vulkan_device.handle()));
+        VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(vulkan_device.handle()));
 
         vk_object_registry.destroy_immediate(depth_attachment_image_view);
         vk_object_registry.destroy_immediate(depth_attachment_image);
@@ -372,7 +372,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             depth_attachment_image_memory,
             depth_attachment_image_view))
         {
-            std::println(stderr, "[Vulkan] : Error : failed to crate depth attachment");
+            std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
             return false;
         }
 
@@ -423,17 +423,10 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 "unexpected error occurred while acquiring the swapchain image");
         }
 
-        auto const [image_acquired_semaphore, swapchain_image_index] = acquired.value();
+        auto const [swapchain_image_acquired_semaphore, swapchain_image_index] = acquired.value();
 
         auto const current_frame_fence = vk_object_registry.resolve_handle(frame_ring.current_frame_fence());
         if (!VKGC_ENSURE_VKHANDLE(current_frame_fence))
-        {
-            return false;
-        }
-
-        auto const execution_complete_semaphore = vk_object_registry.resolve_handle(
-            execution_complete_semaphores[swapchain_image_index]);
-        if (!VKGC_ENSURE_VKHANDLE(execution_complete_semaphore))
         {
             return false;
         }
@@ -580,25 +573,50 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return false;
         }
 
+        auto const execution_complete_semaphore = vk_object_registry.resolve_handle(
+            execution_complete_semaphores[swapchain_image_index]);
+        VKGC_VERIFY(execution_complete_semaphore);
+
         {
-            std::array constexpr wait_stages{
-                VkPipelineStageFlags{VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT}
+            VkSemaphoreSubmitInfo const wait_semaphore_info{
+                .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
+                .pNext{nullptr},
+                .semaphore{swapchain_image_acquired_semaphore},
+                .value{0},
+                .stageMask{VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT},
+                .deviceIndex{0}
             };
 
-            VkSubmitInfo const submit_info{
-                .sType{VK_STRUCTURE_TYPE_SUBMIT_INFO},
+            VkCommandBufferSubmitInfo const command_buffer_info{
+                .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
                 .pNext{nullptr},
-                .waitSemaphoreCount{1},
-                .pWaitSemaphores{&image_acquired_semaphore},
-                .pWaitDstStageMask{wait_stages.data()},
-                .commandBufferCount{1},
-                .pCommandBuffers{&command_buffer},
-                .signalSemaphoreCount{1},
-                .pSignalSemaphores{&execution_complete_semaphore}
+                .commandBuffer{command_buffer},
+                .deviceMask{0}
+            };
+
+            VkSemaphoreSubmitInfo const signal_semaphore_info{
+                .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
+                .pNext{nullptr},
+                .semaphore{execution_complete_semaphore},
+                .value{0},
+                .stageMask{VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT},
+                .deviceIndex{0}
+            };
+
+            VkSubmitInfo2 const submit_info{
+                .sType{VK_STRUCTURE_TYPE_SUBMIT_INFO_2},
+                .pNext{nullptr},
+                .flags{0},
+                .waitSemaphoreInfoCount{1},
+                .pWaitSemaphoreInfos{&wait_semaphore_info},
+                .commandBufferInfoCount{1},
+                .pCommandBufferInfos{&command_buffer_info},
+                .signalSemaphoreInfoCount{1},
+                .pSignalSemaphoreInfos{&signal_semaphore_info}
             };
 
             VKGC_VERIFYF_VKSUCCESS(
-                vkQueueSubmit(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence),
+                vkQueueSubmit2(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence),
                 "failed to submit [#{}] frame render command buffer", frame_index);
         }
 
@@ -626,12 +644,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         glfwPollEvents();
         return true;
     });
-
-    // All teardown is automatic, in reverse declaration order:
-    //   ~frame_ring     - waits all slot fences, drains pending, destroys slot fences
-    //   ~presenter      - vkDeviceWaitIdle, destroys image_acquired semaphores, vkDestroySwapchainKHR
-    //   ~resources      - vkDeviceWaitIdle, walks pools, destroys remaining live entries
-    //   ~vulkan_device  - vkDeviceWaitIdle (defensive), destroys device + VMA allocator
 
     return true;
 }
