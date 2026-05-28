@@ -3,7 +3,7 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <memory>
+#include <new>
 #include <type_traits>
 #include <vector>
 
@@ -60,7 +60,7 @@ export namespace vkgc
             {
                 slot_index = head_free_;
                 head_free_ = slots_[slot_index].next_free;
-                std::construct_at(&slots_[slot_index].payload, payload);
+                ::new (static_cast<void*>(&slots_[slot_index].payload)) Payload{payload};
             }
             else
             {
@@ -106,8 +106,9 @@ export namespace vkgc
 
             Payload result{slot->payload};
 
-            std::destroy_at(&slot->payload);
-            std::construct_at(&slot->next_free, head_free_);
+            // Payload is trivially destructible (VkSlotMapPayload), so reusing the
+            // union storage with placement-new ends its lifetime without a dtor call.
+            ::new (static_cast<void*>(&slot->next_free)) std::uint32_t{head_free_};
             head_free_ = handle.index;
             slot->generation = 0;
 
