@@ -15,6 +15,10 @@ target_compile_features(vkgc_cxx_runtime
     INTERFACE
         cxx_std_23)
 
+# INTERFACE_POSITION_INDEPENDENT_CODE propagates through to chapter executables, making each
+# chapter binary PIE. Intentional security-hardening default — pairs with the link-time
+# hardening flags in vkgc::hardening. Carries a small overhead on some ELF architectures
+# (PLT indirection, slight code-size inflation) which is accepted for a teaching project.
 set_target_properties(vkgc_cxx_runtime
     PROPERTIES
         INTERFACE_POSITION_INDEPENDENT_CODE ON
@@ -124,6 +128,9 @@ target_compile_options(vkgc_warnings
             -Wno-unused-macros
         ">"
 
+        # `/WX` already promotes every warning to an error, so the `/w14NNNN` form (enable at L1)
+        # is sufficient — `/we4NNNN` (treat-as-error) would be redundant. Kept uniform across the
+        # list for that reason.
         "$<${IS_MSVC}:"
             /W4
             /WX
@@ -132,7 +139,7 @@ target_compile_options(vkgc_warnings
             /w14263 # 'function': member function does not override any base class virtual member function
             /w14265 # 'classname': class has virtual functions, but destructor is not virtual
             /w14287 # 'operator': unsigned/negative constant mismatch
-            /we4289 # 'variable': loop control variable declared in the for-loop is used outside the for-loop scope
+            /w14289 # 'variable': loop control variable declared in the for-loop is used outside the for-loop scope
             /w14296 # 'operator': expression is always 'boolean_value'
             /w14311 # 'variable': pointer truncation from 'type1' to 'type2'
             /w14545 # expression before comma evaluates to a function which is missing an argument list
@@ -269,20 +276,27 @@ if (VKGC_ENABLE_ASAN)
     # via vs_link_exe (no driver), so that path never reaches the linker and the symbols come back
     # undefined — add the compiler-rt lib dir to the search path ourselves. Not needed for native MSVC
     # (compiler-rt is on the default LIB) or clang-MSYS (GNU driver auto-resolves its runtime).
+    # The probe result is cached so a re-configure doesn't fork the compiler again.
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-        AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        execute_process(
-            COMMAND ${CMAKE_CXX_COMPILER} -print-resource-dir
-            OUTPUT_VARIABLE _vkgc_clang_resource_dir
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            COMMAND_ERROR_IS_FATAL ANY
-        )
+            AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+
+        if (NOT DEFINED CACHE{VKGC_CLANG_CL_RESOURCE_DIR})
+            execute_process(
+                    COMMAND ${CMAKE_CXX_COMPILER} -print-resource-dir
+                    OUTPUT_VARIABLE _vkgc_clang_resource_dir
+                    OUTPUT_STRIP_TRAILING_WHITESPACE
+                    COMMAND_ERROR_IS_FATAL ANY
+            )
+            set(VKGC_CLANG_CL_RESOURCE_DIR "${_vkgc_clang_resource_dir}"
+                    CACHE INTERNAL "clang-cl compiler-rt resource dir (cached `clang -print-resource-dir`)")
+            unset(_vkgc_clang_resource_dir)
+        endif ()
+
         target_link_directories(vkgc_sanitizers_address
-            INTERFACE "${_vkgc_clang_resource_dir}/lib/windows"
+                INTERFACE "${VKGC_CLANG_CL_RESOURCE_DIR}/lib/windows"
         )
-        unset(_vkgc_clang_resource_dir)
-    endif()
-endif()
+    endif ()
+endif ()
 
 
 # === vkgc::sanitizers::undefined ===
@@ -329,9 +343,12 @@ endif()
 
 
 # === vkgc::platform_quirks ===
-# Platform-level defines not tied to any specific dependency. Currently just NOMINMAX on Windows to
-# suppress the min/max macros from <windows.h>. Dependency-coupled platform defines
-# (VK_USE_PLATFORM_*, GLFW_EXPOSE_NATIVE_*) belong with their vkgc::dependencies::* targets.
+# Platform-level defines not tied to any specific dependency. On Windows: NOMINMAX suppresses the
+# min/max macros from <windows.h>, and WIN32_LEAN_AND_MEAN trims the surface to core Win32 (no
+# winsock / OLE / COM by default). Both are inert in TUs that never include <windows.h>;
+# GLFW_NATIVE_INCLUDE_NONE keeps GLFW out of that path, so this currently only affects user TUs
+# that include <windows.h> directly. Dependency-coupled platform defines (VK_USE_PLATFORM_*,
+# GLFW_EXPOSE_NATIVE_*) belong with their vkgc::dependencies::* targets.
 
 add_library(vkgc_platform_quirks INTERFACE)
 add_library(vkgc::platform_quirks ALIAS vkgc_platform_quirks)
@@ -340,5 +357,7 @@ target_compile_definitions(vkgc_platform_quirks
     INTERFACE
         "$<$<PLATFORM_ID:Windows>:"
             NOMINMAX
+            WIN32_LEAN_AND_MEAN
+            VC_EXTRA_LEAN   # optional, even more aggressive
         ">"
 )

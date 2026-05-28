@@ -147,12 +147,30 @@ target_link_libraries(vkgc_dependencies_shaders
 # compiler's lower default; gated to GNU-driver compilers where -std=c++23 is valid (clang-cl/MSVC use
 # /std: and never have __GLIBCXX__).
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
-   OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
-       AND "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xGNU"))
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+        OR (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+        AND "x${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "xGNU"))
+    # CheckCXXSourceCompiles caches its results by variable name only; it does not invalidate
+    # when the compiler changes underneath the build tree. Switching e.g. GCC → Clang-MSYS via
+    # `-DCMAKE_CXX_COMPILER=clang++` would keep a stale `VKGC_USING_LIBSTDCXX=1` and link the
+    # wrong runtime extras. Tag the probe with a compiler key and re-run on mismatch.
+    set(_vkgc_libstdcxx_probe_key
+            "${CMAKE_CXX_COMPILER_ID}|${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}|${CMAKE_CXX_COMPILER}")
+
+    if (NOT "$CACHE{VKGC_LIBSTDCXX_PROBE_KEY}" STREQUAL "${_vkgc_libstdcxx_probe_key}")
+        unset(VKGC_USING_LIBSTDCXX CACHE)
+        unset(VKGC_LIBSTDCXX_PRINT_SELF_CONTAINED CACHE)
+        set(VKGC_LIBSTDCXX_PROBE_KEY "${_vkgc_libstdcxx_probe_key}"
+                CACHE INTERNAL "compiler signature behind VKGC_USING_LIBSTDCXX / VKGC_LIBSTDCXX_PRINT_SELF_CONTAINED")
+    endif ()
+
+    unset(_vkgc_libstdcxx_probe_key)
+
     include(CheckCXXSourceCompiles)
+
     set(CMAKE_REQUIRED_FLAGS_SAVED "${CMAKE_REQUIRED_FLAGS}")
     set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS} -std=c++23")
+
     check_cxx_source_compiles([[
         #include <version>
         #ifndef __GLIBCXX__
@@ -160,15 +178,18 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
         #endif
         int main() {}
     ]] VKGC_USING_LIBSTDCXX)
-    if(VKGC_USING_LIBSTDCXX)
+
+    if (VKGC_USING_LIBSTDCXX)
         check_cxx_source_compiles([[
             #include <print>
             int main() { std::println("probe"); }
         ]] VKGC_LIBSTDCXX_PRINT_SELF_CONTAINED)
-    endif()
+    endif ()
+
     set(CMAKE_REQUIRED_FLAGS "${CMAKE_REQUIRED_FLAGS_SAVED}")
+
     unset(CMAKE_REQUIRED_FLAGS_SAVED)
-endif()
+endif ()
 
 add_library(vkgc_dependencies_stdcxx_extras INTERFACE)
 add_library(vkgc::dependencies::stdcxx_extras ALIAS vkgc_dependencies_stdcxx_extras)
