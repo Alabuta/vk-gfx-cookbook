@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 project(vk_gfx_cookbook VERSION 1.0.0 LANGUAGES CXX)
 
+# --- Single-config build-type default ---
+# Multi-config generators (VS, Xcode) drive CMAKE_CONFIGURATION_TYPES; on Ninja/Makefiles an
+# unset CMAKE_BUILD_TYPE makes $<CONFIG> evaluate to "", which silently zeroes VKGC_DO_CHECK /
+# VKGC_DEBUG_VULKAN and produces a stealth Release build with no debug checks. Presets in
+# CMakePresets.json always pin a build type, so this guard only fires on bypass-presets configures.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
+        "Build type (Debug/Release/RelWithDebInfo/MinSizeRel)" FORCE)
+    message(STATUS "No CMAKE_BUILD_TYPE specified — defaulting to Debug")
+endif()
+
 # --- User-facing options ---
 
 option(VKGC_ENABLE_ASAN
