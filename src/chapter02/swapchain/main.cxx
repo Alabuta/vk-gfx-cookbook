@@ -379,7 +379,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return true;
     };
 
-    vkgc::run_app([&]
+    vkgc::update_app([&]
     {
         if (window.should_close())
         {
@@ -623,8 +623,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             break;
         }
 
-        // Poll events
-
+        glfwPollEvents();
         return true;
     });
 

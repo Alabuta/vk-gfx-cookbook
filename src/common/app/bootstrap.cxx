@@ -10,6 +10,19 @@ module;
 #include "diagnostic/assert.hxx"
 #include "vulkan/assert.hxx"
 
+#ifdef _CPPUNWIND
+  #error exceptions are on
+#endif
+#ifdef __EXCEPTIONS
+  #error exceptions are on
+#endif
+#ifdef _HAS_EXCEPTIONS
+    #if _HAS_EXCEPTIONS != 0
+      #error exceptions are on
+    #endif
+#endif
+
+
 module vkgc.bootstrap;
 
 namespace vkgc
@@ -26,13 +39,11 @@ namespace vkgc
         VKGC_VERIFYF_VKSUCCESS(volkInitialize(), "'volk' meta-loader initialization failed");
     }
 
-    void run_app(std::function<bool()> const& callback)
+    void update_app(std::function<bool()> const& callback)
     {
         bool continue_app_run{true};
         while (continue_app_run)
         {
-            glfwPollEvents();
-
             if (callback)
             {
                 continue_app_run = callback();
