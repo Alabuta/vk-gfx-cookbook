@@ -22,9 +22,9 @@ set_target_properties(vkgc_cxx_runtime
 
 
 # === vkgc::warnings ===
-# Strict warnings + warnings-as-errors across all compiler families. GNU-driver compilers (GCC +
-# MinGW + Clang-MSYS) and "bilingual" clang-cl share `-W*` spellings; MSVC native uses `/W4 /WX`
-# plus per-warning `/wNNNNN` opt-ins. Also carries the GCC-family `-pipe` /
+# Strict warnings + warnings-as-errors across all compiler families. GNU-driver compilers (GCC-POSIX,
+# Clang-POSIX, MinGW, Clang-MSYS) and "bilingual" clang-cl share `-W*` spellings; MSVC native uses
+# `/W4 /WX` plus per-warning `/wNNNNN` opt-ins. Also carries the GCC-family `-pipe` /
 # `-fasynchronous-unwind-tables` codegen helpers — too small a set to deserve a separate target.
 
 add_library(vkgc_warnings INTERFACE)
@@ -32,7 +32,11 @@ add_library(vkgc::warnings ALIAS vkgc_warnings)
 
 target_compile_options(vkgc_warnings
     INTERFACE
-        "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS},${IS_CLANG_CL}>:"
+        # Shared GNU-driver core: GCC + Clang on all platforms (POSIX/MSYS/clang-cl).
+        # Only flags GCC actually accepts go here; Clang-only `-Wno-*` lives in the next block
+        # because GCC errors on unrecognized `-Wno-*` whenever the underlying category would fire
+        # (with -Werror, that's a build break — even if today's GCC happens not to raise it).
+        "$<$<OR:${IS_GCC_POSIX},${IS_CLANG_POSIX},${IS_MINGW},${IS_CLANG_MSYS},${IS_CLANG_CL}>:"
             -Wpedantic
             -Wall
             -Wextra
@@ -49,23 +53,6 @@ target_compile_options(vkgc_warnings
             -Wdouble-promotion
             -Wformat=2
             -Wmisleading-indentation
-
-            -Wno-braced-scalar-init
-
-            -Wno-c++98-compat
-            -Wno-c++98-compat-pedantic
-
-            -Wno-pre-c++17-compat
-
-            # Project is C++23-only; the -Wc++NN-compat family flags C++20+ features as
-            # "won't work in older standards" — noise for forward-only code.
-            -Wno-c++20-compat
-
-            # Vulkan-struct designated init (`{.sType{X}}`) omits pNext and payload members;
-            # C++20 value-initializes them to {} / nullptr, so it's idiomatic and safe. Clang 19+
-            # raises -Wmissing-designated-field-initializers on every such site for no benefit here.
-            # GCC's separate -Wmissing-field-initializers stays active.
-            -Wno-missing-designated-field-initializers
 
             # Vulkan enums (VkResult, VkDebugReportObjectType, ...) carry sentinel *_MAX_ENUM values
             # and grow every SDK update; enumerating every case in formatter switches is a treadmill.
@@ -84,7 +71,29 @@ target_compile_options(vkgc_warnings
             -Wno-padded
         ">"
 
-        "$<$<OR:${IS_GNU_LINUX},${IS_MINGW}>:"
+        # Clang-only `-Wno-*`. Kept separate from the shared block: GCC silently accepts unknown
+        # `-Wno-*` at parse time, but reports `unrecognized command-line option` if the
+        # corresponding diagnostic would have fired — and with -Werror, that report is fatal.
+        "$<$<OR:${IS_CLANG_POSIX},${IS_CLANG_MSYS},${IS_CLANG_CL}>:"
+            -Wno-braced-scalar-init
+
+            -Wno-c++98-compat
+            -Wno-c++98-compat-pedantic
+
+            -Wno-pre-c++17-compat
+
+            # Project is C++23-only; the -Wc++NN-compat family flags C++20+ features as
+            # "won't work in older standards" — noise for forward-only code.
+            -Wno-c++20-compat
+
+            # Vulkan-struct designated init (`{.sType{X}}`) omits pNext and payload members;
+            # C++20 value-initializes them to {} / nullptr, so it's idiomatic and safe. Clang 19+
+            # raises -Wmissing-designated-field-initializers on every such site for no benefit here.
+            # GCC's separate -Wmissing-field-initializers stays active.
+#            -Wno-missing-designated-field-initializers
+        ">"
+
+        "$<$<OR:${IS_GCC_POSIX},${IS_MINGW}>:"
             -fasynchronous-unwind-tables                # Increased reliability of backtraces
 
             -pipe
@@ -182,7 +191,7 @@ add_library(vkgc::no_exceptions ALIAS vkgc_no_exceptions)
 
 target_compile_options(vkgc_no_exceptions
     INTERFACE
-        "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
+        "$<$<OR:${IS_GCC_POSIX},${IS_CLANG_POSIX},${IS_MINGW},${IS_CLANG_MSYS}>:"
             -fno-exceptions
         ">"
 
@@ -234,7 +243,7 @@ add_library(vkgc::sanitizers::address ALIAS vkgc_sanitizers_address)
 if (VKGC_ENABLE_ASAN)
     target_compile_options(vkgc_sanitizers_address
         INTERFACE
-            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
+            "$<$<OR:${IS_GCC_POSIX},${IS_CLANG_POSIX},${IS_MINGW},${IS_CLANG_MSYS}>:"
                 -fsanitize=address
                 -fno-omit-frame-pointer
             ">"
@@ -246,7 +255,7 @@ if (VKGC_ENABLE_ASAN)
 
     target_link_options(vkgc_sanitizers_address
         INTERFACE
-            "$<$<OR:${IS_GNU_LINUX},${IS_MINGW},${IS_CLANG_MSYS}>:"
+            "$<$<OR:${IS_GCC_POSIX},${IS_CLANG_POSIX},${IS_MINGW},${IS_CLANG_MSYS}>:"
                 -fsanitize=address
             ">"
 
@@ -299,7 +308,7 @@ add_library(vkgc::sanitizers::undefined ALIAS vkgc_sanitizers_undefined)
 if (VKGC_ENABLE_UBSAN)
     target_compile_options(vkgc_sanitizers_undefined
         INTERFACE
-            "$<${IS_CLANG_MSYS}:"
+            "$<$<OR:${IS_CLANG_POSIX},${IS_CLANG_MSYS}>:"
                 -fsanitize=undefined
                 -fno-omit-frame-pointer
             ">"
@@ -312,7 +321,7 @@ if (VKGC_ENABLE_UBSAN)
 
     target_link_options(vkgc_sanitizers_undefined
         INTERFACE
-            "$<${IS_CLANG_MSYS}:"
+            "$<$<OR:${IS_CLANG_POSIX},${IS_CLANG_MSYS}>:"
                 -fsanitize=undefined
             ">"
     )

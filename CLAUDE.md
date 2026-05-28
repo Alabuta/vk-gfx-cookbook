@@ -77,7 +77,7 @@ For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCM
 - `shaders/chapterNN/<topic>/` — GLSL sources consumed by chapter targets at runtime; located via the `COOKBOOK_SHADER_DIR_STRING` compile define carried by `vkgc::config::cookbook_paths`
 - `.cache/` — runtime output for compiled SPIR-V and other generated artifacts; located via `COOKBOOK_CACHE_DIR_STRING` (same source); gitignored
 - Root `CMakeLists.txt` — toolchain-shaping invariants, non-transitive target-property defaults, and `include()`s for the modules below
-- `cmake/CompilerDispatch.cmake` — `IS_*` generator-expression aliases (`IS_GNU_LINUX`, `IS_MINGW`, `IS_CLANG_MSYS`, `IS_CLANG_CL`, `IS_MSVC`) consumed by every policy/interface target
+- `cmake/CompilerDispatch.cmake` — `IS_*` generator-expression aliases (`IS_GCC_POSIX`, `IS_CLANG_POSIX`, `IS_MINGW`, `IS_CLANG_MSYS`, `IS_CLANG_CL`, `IS_MSVC`) consumed by every policy/interface target
 - `cmake/Dependencies.cmake` — `FetchContent_Declare` for all third-party libs
 - `cmake/Policies.cmake` — `vkgc::cxx_runtime`, `vkgc::warnings`, `vkgc::hardening`, `vkgc::no_exceptions`, `vkgc::diagnostics`, `vkgc::platform_quirks` INTERFACE targets
 - `cmake/Interfaces.cmake` — `vkgc::dependencies::*` (vulkan, windowing, math, concurrency, shaders, stdcxx_extras) and `vkgc::config::cookbook_paths` INTERFACE targets
@@ -100,10 +100,11 @@ For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCM
 
 ## Compiler Configuration
 
-Warnings are treated as errors (`-Werror` / `/WX`). `cmake/Interfaces.cmake` defines `vkgc::warnings`, dispatched via the `IS_*` generator-expression aliases in `cmake/CompilerDispatch.cmake` (`IS_GNU_LINUX`, `IS_MINGW`, `IS_CLANG_MSYS`, `IS_CLANG_CL`, `IS_MSVC`):
+Warnings are treated as errors (`-Werror` / `/WX`). `cmake/Policies.cmake` defines `vkgc::warnings`, dispatched via the `IS_*` generator-expression aliases in `cmake/CompilerDispatch.cmake` (`IS_GCC_POSIX`, `IS_CLANG_POSIX`, `IS_MINGW`, `IS_CLANG_MSYS`, `IS_CLANG_CL`, `IS_MSVC`):
 
-- **GNU-driver compilers** (GCC + MinGW + Clang-MSYS + Clang-cl — "bilingual"): shared base of `-Wpedantic -Wall -Wextra -Werror -Wconversion` plus the usual quality block (`-Wold-style-cast`, `-Wsign-conversion`, `-Wnull-dereference`, `-Wformat=2`, …) with selective `-Wno-*` opt-outs
-- **GCC family only** (GNU + MinGW): additional GCC-only warnings (`-Wduplicated-cond`, `-Wduplicated-branches`, `-Wlogical-op`, `-Wuseless-cast`) plus `-pipe` / `-fasynchronous-unwind-tables`
+- **Shared GNU-driver core** (GCC + Clang on every platform): `-Wpedantic -Wall -Wextra -Werror -Wconversion` plus the usual quality block (`-Wold-style-cast`, `-Wsign-conversion`, `-Wnull-dereference`, `-Wformat=2`, …) and the `-Wno-switch-enum` / `-Wno-switch-default` / `-Wno-padded` Vulkan-specific suppressions GCC accepts
+- **Clang-only** (`IS_CLANG_POSIX` + `IS_CLANG_MSYS` + `IS_CLANG_CL`): the `-Wno-*` flags GCC doesn't recognize (`-Wno-c++98-compat`, `-Wno-pre-c++17-compat`, `-Wno-braced-scalar-init`, `-Wno-missing-designated-field-initializers`). Kept separate because GCC errors on unrecognized `-Wno-*` whenever the category would have fired — under `-Werror`, fatal
+- **GCC family only** (`IS_GCC_POSIX` + `IS_MINGW`): additional GCC-only warnings (`-Wduplicated-cond`, `-Wduplicated-branches`, `-Wlogical-op`, `-Wuseless-cast`) plus `-pipe` / `-fasynchronous-unwind-tables`
 - **Clang-cl**: extra `-Wno-*` suppressions that keep the CLion compiler-info probe happy under `-Weverything`
 - **MSVC native**: `/W4 /WX` plus per-warning `/wNNNNN` opt-ins for specific narrowing/conversion/lifetime issues
 
