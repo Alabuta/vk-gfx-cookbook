@@ -5,8 +5,8 @@
 
 
 # === vkgc::cxx_runtime ===
-# C++ language standard and position-independent code. cxx_std_23 propagates as a transitive
-# compile feature (modern equivalent of CXX_STANDARD=23 which is non-transitive through INTERFACE).
+# C++ standard and position-independent code. cxx_std_23 propagates as a transitive compile feature
+# (the modern equivalent of CXX_STANDARD=23, which is non-transitive through INTERFACE).
 
 add_library(vkgc_cxx_runtime INTERFACE)
 add_library(vkgc::cxx_runtime ALIAS vkgc_cxx_runtime)
@@ -22,11 +22,10 @@ set_target_properties(vkgc_cxx_runtime
 
 
 # === vkgc::warnings ===
-# Strict warnings + warnings-as-errors across all four compiler families. GNU-driver compilers
-# (GCC + MinGW + Clang-MSYS) and clang-cl share `-W*` spellings (clang-cl is "bilingual"); MSVC
-# native uses `/W4 /WX` plus per-warning `/wNNNNN` opt-ins. Also carries `-pipe` /
-# `-fasynchronous-unwind-tables` codegen helpers for GCC-family — too small a set to deserve a
-# separate target.
+# Strict warnings + warnings-as-errors across all compiler families. GNU-driver compilers (GCC +
+# MinGW + Clang-MSYS) and "bilingual" clang-cl share `-W*` spellings; MSVC native uses `/W4 /WX`
+# plus per-warning `/wNNNNN` opt-ins. Also carries the GCC-family `-pipe` /
+# `-fasynchronous-unwind-tables` codegen helpers — too small a set to deserve a separate target.
 
 add_library(vkgc_warnings INTERFACE)
 add_library(vkgc::warnings ALIAS vkgc_warnings)
@@ -58,35 +57,30 @@ target_compile_options(vkgc_warnings
 
             -Wno-pre-c++17-compat
 
-            # Project is C++23-only; the -Wc++NN-compat family flags C++20+ features
-            # as "won't work in older standards" — pure noise for forward-only code.
+            # Project is C++23-only; the -Wc++NN-compat family flags C++20+ features as
+            # "won't work in older standards" — noise for forward-only code.
             -Wno-c++20-compat
 
-            # Vulkan-struct designated init (`{.sType{X}}`) deliberately omits pNext and
-            # payload members; C++20 value-initializes them to {} / nullptr so it's
-            # idiomatic and safe. Clang 19+ raises -Wmissing-designated-field-initializers
-            # on every such site, which adds nothing for this codebase. GCC's separate
-            # -Wmissing-field-initializers is still active.
+            # Vulkan-struct designated init (`{.sType{X}}`) omits pNext and payload members;
+            # C++20 value-initializes them to {} / nullptr, so it's idiomatic and safe. Clang 19+
+            # raises -Wmissing-designated-field-initializers on every such site for no benefit here.
+            # GCC's separate -Wmissing-field-initializers stays active.
             -Wno-missing-designated-field-initializers
 
-            # Vulkan enums (VkResult, VkDebugReportObjectType, ...) carry sentinel
-            # *_MAX_ENUM values and grow with every SDK update; enumerating every case
-            # in formatter switches is a treadmill. -Wswitch (no default + missing
-            # cases) is still active, so genuinely-uncovered switches still error out.
+            # Vulkan enums (VkResult, VkDebugReportObjectType, ...) carry sentinel *_MAX_ENUM values
+            # and grow every SDK update; enumerating every case in formatter switches is a treadmill.
+            # -Wswitch (no default + missing cases) stays active, so truly-uncovered switches error.
             -Wno-switch-enum
 
-            # Exhaustive switches over project enums (e.g. present_status) deliberately
-            # omit `default:` so that adding a new enumerator triggers -Wswitch on every
-            # call site. -Wswitch-default enforces the opposite preference (always add
-            # a fallback) and would mask exactly the kind of churn we want surfaced.
+            # Exhaustive switches over project enums (e.g. present_status) omit `default:` so a new
+            # enumerator trips -Wswitch at every call site. -Wswitch-default wants the opposite (always
+            # add a fallback) and would mask exactly the churn we want surfaced.
             -Wno-switch-default
 
-            # Vulkan payload structs hit -Wpadded because the natural field layout
-            # (pointer-sized handle + 4-byte enum / 1-byte bool / etc.) leaves
-            # unavoidable trailing padding to satisfy 8-byte alignment. Reordering
-            # can't dissolve the padding without filler fields, which is worse than
-            # the diagnostic. The warning is off by default upstream; suppress so
-            # the implicit enable doesn't break us.
+            # Vulkan payload structs hit -Wpadded: the natural layout (pointer-sized handle +
+            # 4-byte enum / 1-byte bool / ...) leaves unavoidable trailing padding for 8-byte
+            # alignment, and reordering can't dissolve it without filler fields (worse than the
+            # diagnostic). Off by default upstream; suppress so an implicit enable can't break us.
             -Wno-padded
         ">"
 
@@ -107,17 +101,15 @@ target_compile_options(vkgc_warnings
 
             -Wno-shadow-field-in-constructor
 
-            # CMake's Windows-Clang-CXX module injects `-TP` (force C++) on every CXX
-            # compile rule. For .cxxm module interface units, clang already infers C++
-            # from the extension, so `-TP` is redundant and `-Wunused-command-line-argument`
-            # flags it — fatal under `-Werror`. Suppress project-wide; we don't rely on
-            # this warning to police flag drift.
+            # CMake's Windows-Clang-CXX module injects `-TP` (force C++) on every CXX compile rule.
+            # For .cxxm units clang already infers C++ from the extension, so `-TP` is redundant and
+            # `-Wunused-command-line-argument` flags it — fatal under `-Werror`. Suppress project-wide;
+            # we don't rely on this warning to police flag drift.
             -Wno-unused-command-line-argument
 
-            # For CLion's compiler-info probe: it runs clang-cl with -Weverything
-            # on a synthetic TU full of reserved identifiers (`___CIDR_*`); without
-            # these, -Werror kills the probe and IDE intelligence breaks. Inert
-            # for real builds (not in -Wall/-Wextra).
+            # CLion's compiler-info probe runs clang-cl with -Weverything on a synthetic TU full of
+            # reserved identifiers (`___CIDR_*`); without these, -Werror kills the probe and IDE
+            # intelligence breaks. Inert for real builds (not in -Wall/-Wextra).
             -Wno-reserved-macro-identifier
             -Wno-reserved-identifier
             -Wno-unused-macros
@@ -151,9 +143,8 @@ target_compile_options(vkgc_warnings
 
 # === vkgc::hardening ===
 # Link-time hardening: detect underlinking, disable lazy binding, enforce read-only-after-relocation.
-# ELF-only concepts — PE/COFF (Windows) already requires every import to be resolved against an
-# import library at link time, so MinGW/Clang-MSYS need nothing here. MSVC link.exe wouldn't accept
-# these spellings anyway.
+# ELF-only — PE/COFF (Windows) already resolves every import against an import library at link time,
+# so MinGW/Clang-MSYS need nothing here, and MSVC link.exe wouldn't accept these spellings anyway.
 
 add_library(vkgc_hardening INTERFACE)
 add_library(vkgc::hardening ALIAS vkgc_hardening)
@@ -173,19 +164,18 @@ target_link_options(vkgc_hardening
 
 
 # === vkgc::no_exceptions ===
-# Disable C++ exceptions. clang-cl rejects -fno-exceptions (-Wunknown-argument, fatal under
-# -Werror) and follows MSVC convention; everything else takes the GNU-driver spelling.
+# Disable C++ exceptions. clang-cl rejects -fno-exceptions (-Wunknown-argument, fatal under -Werror)
+# and follows MSVC convention; everything else takes the GNU-driver spelling.
 #
-# `_HAS_EXCEPTIONS=0` on MSVC / clang-cl is a best-effort cover, not airtight. It rewrites the
-# inline `_THROW(...)` macro to terminate and adds `_Doraise()` overrides on the std exception
-# classes, so throws written directly into STL headers redirect through std::terminate. It does
-# NOT remove APIs like `vector::at()` and does NOT recompile the runtime: out-of-line throw
-# helpers (`_Xout_of_range`, `_Xlength_error`, `_Xbad_alloc`, …) are declared `_CRTIMP2_PURE`
-# in <xutility> and live in msvcp140.dll, which ships built with exceptions enabled. Calling
-# `vector::at()` out of range still hits a real `throw out_of_range` inside the DLL; with
-# /EHs-c- the user frames carry no unwind tables, so the throw rides through to std::terminate
-# instead of being catchable. Treat throwing STL accessors (`at`, `map::at`, `stoi`/`stoX`, …)
-# as effectively banned in this project rather than relying on this target to neutralize them.
+# `_HAS_EXCEPTIONS=0` on MSVC / clang-cl is best-effort, not airtight. It rewrites the inline
+# `_THROW(...)` macro to terminate and adds `_Doraise()` overrides on the std exception classes, so
+# throws written into STL headers redirect through std::terminate. It does NOT remove APIs like
+# `vector::at()` or recompile the runtime: out-of-line throw helpers (`_Xout_of_range`,
+# `_Xlength_error`, …) are `_CRTIMP2_PURE` in <xutility> and live in msvcp140.dll, built with
+# exceptions on. An out-of-range `vector::at()` still throws inside the DLL; under /EHs-c- the user
+# frames carry no unwind tables, so it rides through to std::terminate instead of being catchable.
+# Treat throwing STL accessors (`at`, `map::at`, `stoi`/`stoX`, …) as banned rather than relying on
+# this target to neutralize them.
 
 add_library(vkgc_no_exceptions INTERFACE)
 add_library(vkgc::no_exceptions ALIAS vkgc_no_exceptions)
@@ -198,6 +188,7 @@ target_compile_options(vkgc_no_exceptions
 
         "$<$<OR:${IS_MSVC},${IS_CLANG_CL}>:"
             /EHs-c-
+            /GR-
         ">"
 )
 
@@ -211,8 +202,8 @@ target_compile_definitions(vkgc_no_exceptions
 
 # === vkgc::diagnostics ===
 # Project-defined runtime check toggles. VKGC_DO_ENSURE is always on (hard preconditions);
-# VKGC_DO_CHECK and VKGC_DEBUG_VULKAN gate softer checks and validation-layer messaging on
-# Debug-only.
+# VKGC_DO_CHECK and VKGC_DEBUG_VULKAN gate softer checks and validation-layer messaging to
+# Debug/RelWithDebInfo.
 
 add_library(vkgc_diagnostics INTERFACE)
 add_library(vkgc::diagnostics ALIAS vkgc_diagnostics)
@@ -227,15 +218,15 @@ target_compile_definitions(vkgc_diagnostics
 
 
 # === vkgc::sanitizers::address ===
-# AddressSanitizer (compile + link). Gated by VKGC_ENABLE_ASAN; when OFF this target is empty
-# and inert, so chapters can link it unconditionally. -fno-omit-frame-pointer keeps ASan stack
-# traces useful on the GNU-driver side. MSVC-style frontends use /fsanitize=address and require
-# /INCREMENTAL:NO at link (CMake injects /INCREMENTAL into CMAKE_EXE_LINKER_FLAGS_DEBUG); /RTC1
-# stripping for Debug is handled in the root CMakeLists.txt where the flag string lives.
+# AddressSanitizer (compile + link). Gated by VKGC_ENABLE_ASAN; when OFF the target is empty and
+# inert, so chapters link it unconditionally. -fno-omit-frame-pointer keeps stack traces useful on
+# the GNU-driver side. MSVC-style frontends use /fsanitize=address and need /INCREMENTAL:NO at link
+# (CMake injects /INCREMENTAL into CMAKE_EXE_LINKER_FLAGS_DEBUG); /RTC1 stripping lives in the root
+# CMakeLists.txt with the flag string.
 #
-# Composition notes: combines with vkgc::no_exceptions (/EHs-c- + _HAS_EXCEPTIONS=0 stay valid
-# under ASan) and with vkgc::hardening (ASan's runtime resolves its own symbols, so -z,defs and
-# -no-undefined do not flag false positives on the injected interceptors).
+# Composition: combines with vkgc::no_exceptions (/EHs-c- + _HAS_EXCEPTIONS=0 stay valid under ASan)
+# and vkgc::hardening (ASan resolves its own runtime symbols, so -z,defs / -no-undefined don't
+# false-positive on the injected interceptors).
 
 add_library(vkgc_sanitizers_address INTERFACE)
 add_library(vkgc::sanitizers::address ALIAS vkgc_sanitizers_address)
@@ -264,13 +255,11 @@ if (VKGC_ENABLE_ASAN)
             ">"
     )
 
-    # clang-cl embeds /defaultlib:clang_rt.asan_*.lib pragmas into instrumented objects and
-    # normally relies on the clang-cl driver to inject -libpath:<resource>/lib/windows at
-    # link time. CMake invokes lld-link.exe directly through vs_link_exe (no driver), so the
-    # path never reaches the linker and the symbols come back undefined. Add the compiler-rt
-    # lib directory to the search path ourselves. Native MSVC ships compiler-rt alongside the
-    # toolset on the default LIB so this isn't needed there; clang-MSYS uses the GNU driver
-    # which auto-resolves its runtime on the GCC-style link line.
+    # clang-cl embeds /defaultlib:clang_rt.asan_*.lib pragmas into instrumented objects and relies on
+    # the driver to inject -libpath:<resource>/lib/windows at link. CMake calls lld-link.exe directly
+    # via vs_link_exe (no driver), so that path never reaches the linker and the symbols come back
+    # undefined — add the compiler-rt lib dir to the search path ourselves. Not needed for native MSVC
+    # (compiler-rt is on the default LIB) or clang-MSYS (GNU driver auto-resolves its runtime).
     if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
         AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         execute_process(
@@ -287,11 +276,53 @@ if (VKGC_ENABLE_ASAN)
 endif()
 
 
+# === vkgc::sanitizers::undefined ===
+# UndefinedBehaviorSanitizer (compile + link). Gated by VKGC_ENABLE_UBSAN; when OFF the target is
+# empty and inert, so chapters link it unconditionally — symmetric with vkgc::sanitizers::address,
+# and the two stack (-fsanitize=address,undefined is supported).
+#
+# Clang-only: GCC ICEs on this project's C++20 module units and MSVC native has no UBSan, so both are
+# refused at configure (see the root CMakeLists.txt guard) and need no branch here.
+#   * Clang-MSYS uses -fsanitize=undefined against compiler-rt's ubsan runtime, with
+#     -fno-omit-frame-pointer for readable traces and default print-and-continue (no
+#     -fno-sanitize-recover) so all findings in a run are reported.
+#   * clang-cl instruments in trap mode (-fsanitize-trap=undefined): no ubsan runtime needed, which is
+#     the point — vs_link_exe bypasses the clang driver and can't resolve the compiler-rt libpath (the
+#     ASan issue above). Tradeoff: UB aborts via int3/ud2 with no diagnostic text rather than a report.
+#
+# Composition: combines with vkgc::no_exceptions (/EHs-c-, -fno-exceptions) and vkgc::hardening; the
+# instrumented checks don't trip -z,defs / -no-undefined.
+
+add_library(vkgc_sanitizers_undefined INTERFACE)
+add_library(vkgc::sanitizers::undefined ALIAS vkgc_sanitizers_undefined)
+
+if (VKGC_ENABLE_UBSAN)
+    target_compile_options(vkgc_sanitizers_undefined
+        INTERFACE
+            "$<${IS_CLANG_MSYS}:"
+                -fsanitize=undefined
+                -fno-omit-frame-pointer
+            ">"
+
+            "$<${IS_CLANG_CL}:"
+                -fsanitize=undefined
+                -fsanitize-trap=undefined
+            ">"
+    )
+
+    target_link_options(vkgc_sanitizers_undefined
+        INTERFACE
+            "$<${IS_CLANG_MSYS}:"
+                -fsanitize=undefined
+            ">"
+    )
+endif()
+
+
 # === vkgc::platform_quirks ===
-# Truly platform-level defines that aren't tied to any specific dependency. Currently just
-# NOMINMAX on Windows to suppress the min/max macros from <windows.h>. Dependency-coupled
-# platform defines (VK_USE_PLATFORM_*, GLFW_EXPOSE_NATIVE_*) belong with their respective
-# vkgc::dependencies::* targets.
+# Platform-level defines not tied to any specific dependency. Currently just NOMINMAX on Windows to
+# suppress the min/max macros from <windows.h>. Dependency-coupled platform defines
+# (VK_USE_PLATFORM_*, GLFW_EXPOSE_NATIVE_*) belong with their vkgc::dependencies::* targets.
 
 add_library(vkgc_platform_quirks INTERFACE)
 add_library(vkgc::platform_quirks ALIAS vkgc_platform_quirks)

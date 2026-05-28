@@ -10,6 +10,7 @@ target_link_libraries(chapter01_taskflow
         vkgc::hardening
         vkgc::no_exceptions
         vkgc::sanitizers::address
+        vkgc::sanitizers::undefined
         vkgc::diagnostics
         vkgc::platform_quirks
 

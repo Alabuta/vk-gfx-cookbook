@@ -1,13 +1,12 @@
 # Per-chapter configuration helpers.
 #
-# `vkgc_configure_chapter_target` sets non-transitive target properties that can't be carried by
-# INTERFACE libraries and don't inherit from the corresponding CMAKE_* variables for executables
-# (e.g. DEBUG_POSTFIX, which CMAKE_<CONFIG>_POSTFIX only initializes on non-executable targets).
+# `vkgc_configure_chapter_target` sets non-transitive target properties that INTERFACE libraries
+# can't carry and that executables don't inherit from CMAKE_* variables (e.g. DEBUG_POSTFIX, which
+# CMAKE_<CONFIG>_POSTFIX only initializes on non-executable targets).
 #
-# `vkgc_attach_common_sources` is transitional: Phase A keeps the shared sources under src/common/
-# as TU-level sources attached to each chapter executable; Phase B will extract them to a real
-# vkgc::common OBJECT/STATIC library and the call sites become
-# `target_link_libraries(<target> PRIVATE vkgc::common)`.
+# `vkgc_attach_common_sources` is transitional: Phase A attaches the shared src/common/ sources to
+# each chapter executable as TUs; Phase B extracts them to a vkgc::common OBJECT/STATIC library,
+# turning call sites into `target_link_libraries(<target> PRIVATE vkgc::common)`.
 
 function(vkgc_configure_chapter_target TARGET_NAME)
 

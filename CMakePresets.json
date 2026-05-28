@@ -61,6 +61,32 @@
             "displayName": "Shipping ASan",
             "description": "Shipping (Release) + AddressSanitizer. See _asan for the Windows toolchain constraint.",
             "inherits": ["_asan", "shipping"]
+        },
+        {
+            "name": "_ubsan",
+            "hidden": true,
+            "description": "UndefinedBehaviorSanitizer mixin. Combine with a build-type preset (debug/development/shipping). Clang-only: Clang-MSYS links the compiler-rt ubsan runtime (print mode) and clang-cl instruments in trap mode. The configure refuses MSVC native (no UBSan) and GCC/MinGW (GCC ICEs instrumenting this project's C++20 module units). Composes with _asan (define a combined preset in CMakeUserPresets.json to run both).",
+            "cacheVariables": {
+                "VKGC_ENABLE_UBSAN": "ON"
+            }
+        },
+        {
+            "name": "debug-ubsan",
+            "displayName": "Debug UBSan",
+            "description": "Debug + UndefinedBehaviorSanitizer. See _ubsan for the Windows toolchain constraint.",
+            "inherits": ["_ubsan", "debug"]
+        },
+        {
+            "name": "development-ubsan",
+            "displayName": "Development UBSan",
+            "description": "Development (RelWithDebInfo) + UndefinedBehaviorSanitizer. See _ubsan for the Windows toolchain constraint.",
+            "inherits": ["_ubsan", "development"]
+        },
+        {
+            "name": "shipping-ubsan",
+            "displayName": "Shipping UBSan",
+            "description": "Shipping (Release) + UndefinedBehaviorSanitizer. See _ubsan for the Windows toolchain constraint.",
+            "inherits": ["_ubsan", "shipping"]
         }
     ]
 }

@@ -10,6 +10,7 @@ target_link_libraries(chapter01_glslang
         vkgc::hardening
         vkgc::no_exceptions
         vkgc::sanitizers::address
+        vkgc::sanitizers::undefined
         vkgc::diagnostics
         vkgc::platform_quirks
 

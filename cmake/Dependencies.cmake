@@ -49,8 +49,8 @@ FetchContent_Declare(
 )
 
 # === glslang === (GLSL to SPIR-V compiler; produces `glslang`, `SPIRV`, and `glslang-default-resource-limits` targets)
-# ENABLE_OPT=OFF avoids the SPIRV-Tools dependency that glslang's optimizer pulls in; the
-# update_glslang_sources.py bootstrap step is only needed when the optimizer is on.
+# ENABLE_OPT=OFF avoids the SPIRV-Tools dependency the optimizer pulls in (the
+# update_glslang_sources.py bootstrap is only needed with the optimizer on).
 set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
 set(ENABLE_HLSL OFF CACHE BOOL "" FORCE)
 set(ENABLE_OPT OFF CACHE BOOL "" FORCE)

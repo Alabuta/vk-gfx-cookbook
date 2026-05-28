@@ -22,7 +22,7 @@ Implementations following **"Vulkan 3D Graphics Rendering Cookbook — Second Ed
 
 ## Build System
 
-CMake 3.30+ with the single-config `Ninja` generator. Dependencies fetched via `FetchContent` (no manual installs needed except system-level X11 on Linux). `CMakePresets.json` ships six visible configure presets — `Debug`, `Development`, `Shipping`, `Debug ASan`, `Development ASan`, `Shipping ASan` — plus a hidden `_base`. Each preset pins `CMAKE_BUILD_TYPE` (Debug / RelWithDebInfo / Release) and `VKGC_ENABLE_ASAN`; none pin a compiler. Compiler choice is the developer's, applied externally (env, CLI, or `CMakeUserPresets.json`). No `buildPresets` section — single-config makes them redundant, and dropping them keeps CLion's profile names clean (CLion uses the configure preset's `name` field directly).
+CMake 3.30+ with the single-config `Ninja` generator. Dependencies fetched via `FetchContent` (no manual installs needed except system-level X11 on Linux). `CMakePresets.json` ships nine visible configure presets — `Debug`, `Development`, `Shipping`, `Debug ASan`, `Development ASan`, `Shipping ASan`, `Debug UBSan`, `Development UBSan`, `Shipping UBSan` — plus hidden `_base`, `_asan`, and `_ubsan` mixins. Each preset pins `CMAKE_BUILD_TYPE` (Debug / RelWithDebInfo / Release) and the relevant `VKGC_ENABLE_ASAN` / `VKGC_ENABLE_UBSAN`; none pin a compiler. The two sanitizers compose (`-fsanitize=address,undefined`); the shipped presets enable one at a time, so multi-inherit `_asan` + `_ubsan` in `CMakeUserPresets.json` to run both. UBSan is **Clang-only** (clang-cl trap mode, Clang-MSYS print mode) — the configure refuses MSVC native and the GCC family, since GCC ICEs instrumenting this project's C++20 module units. Compiler choice is the developer's, applied externally (env, CLI, or `CMakeUserPresets.json`). No `buildPresets` section — single-config makes them redundant, and dropping them keeps CLion's profile names clean (CLion uses the configure preset's `name` field directly).
 
 Preset names contain spaces so the CLion profile UI shows them verbatim; quote them on the CLI (`cmake --preset "Debug ASan"`). Build directories follow the same names (`build/Debug ASan/` etc.) — same quoting rule applies.
 
@@ -68,7 +68,7 @@ cmake --build "build/Development ASan" --target chapter02_swapchain
 cmake --list-presets configure
 ```
 
-For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCMAKE_BUILD_TYPE=Debug [-DVKGC_ENABLE_ASAN=ON]` still works.
+For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCMAKE_BUILD_TYPE=Debug [-DVKGC_ENABLE_ASAN=ON] [-DVKGC_ENABLE_UBSAN=ON]` still works.
 
 ## Architecture
 
