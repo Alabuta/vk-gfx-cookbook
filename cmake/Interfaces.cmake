@@ -4,6 +4,18 @@
 #
 # Compiler-family dispatch via IS_* aliases defined in cmake/CompilerDispatch.cmake.
 
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(CheckIncludeFile)
+
+    check_include_file("wayland-client.h" VKGC_HAVE_WAYLAND)
+    check_include_file("xcb/xcb.h" VKGC_HAVE_XCB)
+
+    if (NOT VKGC_HAVE_WAYLAND AND NOT VKGC_HAVE_XCB)
+        message(FATAL_ERROR
+                "No Vulkan WSI backend found on Linux. "
+                "Install libwayland-dev (Wayland) or libxcb1-dev (X11/XCB).")
+    endif ()
+endif ()
 
 # === vkgc::dependencies::vulkan ===
 # volk dynamic loader + VMA allocator. Vulkan::Headers is excluded: volk ships its own vulkan.h, and
@@ -27,13 +39,17 @@ target_compile_definitions(vkgc_dependencies_vulkan
         VMA_STATIC_VULKAN_FUNCTIONS=0
         VMA_DYNAMIC_VULKAN_FUNCTIONS=1
 
-        "$<$<PLATFORM_ID:Linux>:"
+        "$<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${VKGC_HAVE_WAYLAND}>>:"
             VK_USE_PLATFORM_WAYLAND_KHR
+        ">"
+        "$<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${VKGC_HAVE_XCB}>>:"
             VK_USE_PLATFORM_XCB_KHR
         ">"
 
+        # Darwin: VK_EXT_metal_surface is the current path (used by GLFW on macOS).
+        # VK_MVK_macos_surface is the deprecated MoltenVK-specific extension; not defined.
         "$<$<PLATFORM_ID:Darwin>:"
-            VK_USE_PLATFORM_MACOS_MVK
+            VK_USE_PLATFORM_METAL_EXT
         ">"
 
         "$<$<PLATFORM_ID:Windows>:"
@@ -58,6 +74,13 @@ target_link_libraries(vkgc_dependencies_windowing
 target_compile_definitions(vkgc_dependencies_windowing
     INTERFACE
         GLFW_INCLUDE_NONE
+
+        "$<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${VKGC_HAVE_WAYLAND}>>:"
+            GLFW_EXPOSE_NATIVE_WAYLAND
+        ">"
+        "$<$<AND:$<PLATFORM_ID:Linux>,$<BOOL:${VKGC_HAVE_XCB}>>:"
+            GLFW_EXPOSE_NATIVE_X11
+        ">"
 
         "$<$<PLATFORM_ID:Windows>:"
             GLFW_EXPOSE_NATIVE_WIN32
@@ -160,9 +183,16 @@ target_link_libraries(vkgc_dependencies_stdcxx_extras
 # === vkgc::config::cookbook_paths ===
 # Source-tree paths as string-literal compile defines so chapter binaries resolve
 # shader/cache/loader-settings files relative to the repo root rather than the cwd.
+# Also propagates the build-tree include directory holding generated headers (config.hxx
+# from cmake/ProjectVersion.cmake) so chapters can `#include "config.hxx"` uniformly.
 
 add_library(vkgc_config_cookbook_paths INTERFACE)
 add_library(vkgc::config::cookbook_paths ALIAS vkgc_config_cookbook_paths)
+
+target_include_directories(vkgc_config_cookbook_paths
+    INTERFACE
+        ${CMAKE_BINARY_DIR}/generated/include
+)
 
 target_compile_definitions(vkgc_config_cookbook_paths
     INTERFACE

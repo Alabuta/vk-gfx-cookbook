@@ -10,13 +10,24 @@
 
 function(vkgc_configure_chapter_target TARGET_NAME)
 
-    set_target_properties(${TARGET_NAME} PROPERTIES
-        DEBUG_POSTFIX .dbg
+    if (NOT TARGET "${TARGET_NAME}")
+        message(FATAL_ERROR
+                "vkgc_configure_chapter_target: target '${TARGET_NAME}' does not exist")
+    endif ()
+
+    set_target_properties(${TARGET_NAME}
+        PROPERTIES
+            DEBUG_POSTFIX .dbg
     )
 
 endfunction()
 
 function(vkgc_attach_common_sources TARGET_NAME)
+
+    if (NOT TARGET "${TARGET_NAME}")
+        message(FATAL_ERROR
+                "vkgc_attach_common_sources: target '${TARGET_NAME}' does not exist")
+    endif ()
 
     set(COMMON_DIR ${CMAKE_SOURCE_DIR}/src/common)
 

@@ -54,8 +54,5 @@ vcpkg_installed/
 # === Compressed textures ===
 *.ktx2
 
-# === Generated headers ===
-src/config.hxx
-
 # === Claude Code local settings ===
 .claude/settings.local.json
