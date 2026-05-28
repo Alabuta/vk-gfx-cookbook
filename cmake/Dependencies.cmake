@@ -1,17 +1,3 @@
-# Share the populated dependency tree across configure presets. Default would be
-# ${CMAKE_BINARY_DIR}/_deps, i.e. each `build/<preset>/_deps/` re-clones from scratch when the
-# user switches presets. Pinning to a fixed location under build/ (gitignored) means the second
-# preset's first configure populates from cache and runs near-instant. Override with
-# -DFETCHCONTENT_BASE_DIR=... to point at a system-wide mirror.
-#
-# Must precede include(FetchContent): the module's body does its own
-# `set(FETCHCONTENT_BASE_DIR ... CACHE PATH ...)`, and `set(... CACHE ...)` without FORCE is a
-# no-op when the cache slot is already filled. Setting it here populates the slot first so the
-# module's default becomes the no-op; `-D` overrides still win because command-line cache vars
-# are written before any CMakeLists code runs.
-set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/build/_deps/${CMAKE_SYSTEM_PROCESSOR}"
-    CACHE PATH "Shared FetchContent cache across all configure presets")
-
 include(FetchContent)
 
 find_package(Vulkan ${COOKBOOK_VULKAN_API_VERSION_MAJOR}.${COOKBOOK_VULKAN_API_VERSION_MINOR} REQUIRED)
