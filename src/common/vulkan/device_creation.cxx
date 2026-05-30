@@ -17,8 +17,6 @@ module;
 
 #include "vk_mem_alloc.h"
 
-#include "GLFW/glfw3.h"
-
 module vkgc.vulkan_instance;
 
 import vkgc.vulkan_device_features;

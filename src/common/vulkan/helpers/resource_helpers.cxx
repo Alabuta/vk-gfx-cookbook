@@ -1,8 +1,6 @@
 module;
 
-#include <cstdint>
 #include <print>
-#include <vector>
 
 #include <volk.h>
 #include "vulkan/format.hxx"
