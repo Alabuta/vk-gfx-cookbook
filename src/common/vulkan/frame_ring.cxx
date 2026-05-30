@@ -1,16 +1,12 @@
 module;
 
-#include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <print>
-#include <ranges>
 #include <vector>
 
 #include <volk.h>
 
 #include "assert.hxx"
-#include "vulkan/format.hxx"
 
 module vkgc.vulkan_frame_ring;
 
@@ -20,130 +16,106 @@ import vkgc.vulkan_object_registry;
 namespace vkgc
 {
     vulkan_frame_ring::vulkan_frame_ring(vulkan_object_registry& object_registry, std::uint32_t const frames_in_flight)
-        : object_registry_{object_registry}
+        : object_registry_{object_registry}, kFramesInFlight_{frames_in_flight}
     {
-        frame_fences_.resize(frames_in_flight);
-        slot_pending_.resize(frames_in_flight);
+        VKGC_CHECK(kFramesInFlight_ > 1);
 
-        std::ranges::generate(
-            frame_fences_,
-            [this]
-            {
-                return object_registry_.create_fence({
-                    .sType{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO},
-                    .pNext{nullptr},
-                    .flags{VK_FENCE_CREATE_SIGNALED_BIT}
-                });
-            });
+        slot_pending_.resize(kFramesInFlight_);
 
+        frame_slot_semaphore_ = object_registry_.create_timeline_semaphore(0, "frame slot semaphore");
+        VKGC_VERIFY(frame_slot_semaphore_.is_valid());
     }
 
     vulkan_frame_ring::~vulkan_frame_ring()
     {
-        if (VkDevice device_handle = object_registry_.device().handle();
-            device_handle != VK_NULL_HANDLE && !frame_fences_.empty())
-        {
-            std::vector<VkFence> raw_fences;
-            raw_fences.reserve(frame_fences_.size());
-
-            auto projection = frame_fences_ | std::ranges::views::transform([this](vk_fence_handle const handle)
-            {
-                return object_registry_.resolve_handle(handle);
-            });
-            std::ranges::copy_if(
-                projection,
-                std::back_inserter(raw_fences),
-                [](VkFence const fence) { return fence != VK_NULL_HANDLE; });
-
-            if (!raw_fences.empty())
-            {
-                if (auto const result = vkWaitForFences(
-                        device_handle,
-                        static_cast<std::uint32_t>(raw_fences.size()),
-                        raw_fences.data(),
-                        VK_TRUE,
-                        std::numeric_limits<std::uint64_t>::max());
-                    result != VK_SUCCESS)
-                {
-                    std::println(
-                        stderr,
-                        "[Vulkan] : Warning : ~vulkan_frame_ring encountered an error on 'vkWaitForFences' ({})",
-                        result);
-                }
-            }
-        }
-
-        for (std::uint32_t i = 0; i < slot_pending_.size(); ++i)
-        {
-            drain_slot(i);
-        }
-
-        for (auto const fence : frame_fences_)
-        {
-            object_registry_.destroy_immediate(fence);
-        }
-
-        frame_fences_.clear();
-        slot_pending_.clear();
-    }
-
-    std::uint32_t vulkan_frame_ring::begin_frame()
-    {
         auto const device_handle = object_registry_.device().handle();
-        auto const frame_fence = object_registry_.resolve_handle(current_frame_fence());
-
-        if (device_handle != VK_NULL_HANDLE && frame_fence != VK_NULL_HANDLE)
-        {
-            if (!VKGC_ENSURE_VKSUCCESS(vkWaitForFences(
-                    device_handle,
-                    1,
-                    &frame_fence,
-                    VK_TRUE,
-                    std::numeric_limits<std::uint64_t>::max())))
-            {
-                return std::numeric_limits<std::uint32_t>::max();
-            }
-
-            // Destroying previously enqueued objects
-            drain_slot(current_frame_index_);
-
-            if (!VKGC_ENSURE_VKSUCCESS(vkResetFences(device_handle, 1, &frame_fence)))
-            {
-                return std::numeric_limits<std::uint32_t>::max();
-            }
-        }
-
-        return current_frame_index_;
-    }
-
-    void vulkan_frame_ring::end_frame()
-    {
-        if (frame_fences_.empty())
+        if (!VKGC_ENSURE_VKHANDLE(device_handle))
         {
             return;
         }
 
-        current_frame_index_ = (current_frame_index_ + 1) % static_cast<std::uint32_t>(frame_fences_.size());
-    }
-
-    vk_fence_handle vulkan_frame_ring::current_frame_fence() const noexcept
-    {
-        if (frame_fences_.empty())
+        if (auto const wait_semaphore = object_registry_.resolve_handle(frame_slot_semaphore_);
+            VKGC_ENSURE_VKHANDLE(wait_semaphore))
         {
-            return {};
+            VkSemaphoreWaitInfo const wait_info{
+                .sType{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO},
+                .pNext{nullptr},
+                .flags{0},
+                .semaphoreCount{1},
+                .pSemaphores{&wait_semaphore},
+                .pValues{&ended_frame_index_},
+            };
+
+            VKGC_ENSURE_VKSUCCESS(
+                vkWaitSemaphores(device_handle, &wait_info, std::numeric_limits<std::uint64_t>::max()));
         }
 
-        return frame_fences_[current_frame_index_];
+        for (std::uint32_t slot_index = 0; slot_index < slot_pending_.size(); ++slot_index)
+        {
+            drain_slot(slot_index);
+        }
+
+        object_registry_.destroy_immediate(frame_slot_semaphore_);
+
+        slot_pending_.clear();
     }
 
-    std::uint32_t vulkan_frame_ring::current_frame_index() const noexcept
+    std::uint32_t vulkan_frame_ring::begin_frame(std::uint64_t const frame_index)
     {
-        return current_frame_index_;
+        VKGC_CHECKF(started_frame_index_ == ended_frame_index_, "starting a frame without properly ending the last one");
+        VKGC_CHECKF(frame_index >= kFramesInFlight_, "frame index has to be greater or equal to frames-in-flight number");
+
+        auto const device_handle = object_registry_.device().handle();
+        auto const wait_semaphore = object_registry_.resolve_handle(frame_slot_semaphore_);
+
+        if (!VKGC_ENSURE_VKHANDLE(device_handle) || !VKGC_ENSURE_VKHANDLE(wait_semaphore))
+        {
+            return std::numeric_limits<std::uint32_t>::max();
+        }
+
+        frame_slot_index_ = frame_index % kFramesInFlight_;
+
+        {
+            std::uint64_t const wait_value = frame_index - kFramesInFlight_;
+            VKGC_CHECK(wait_value < std::numeric_limits<std::uint32_t>::max());
+
+            VkSemaphoreWaitInfo const wait_info{
+                .sType{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO},
+                .pNext{nullptr},
+                .flags{0},
+                .semaphoreCount{1},
+                .pSemaphores{&wait_semaphore},
+                .pValues{&wait_value},
+            };
+
+            if (!VKGC_ENSURE_VKSUCCESS(
+                    vkWaitSemaphores(device_handle, &wait_info, std::numeric_limits<std::uint64_t>::max())))
+            {
+                return std::numeric_limits<std::uint32_t>::max();
+            }
+        }
+
+        // Destroying previously enqueued objects
+        drain_slot(frame_slot_index_);
+
+        started_frame_index_ = frame_index;
+
+        return frame_slot_index_;
+    }
+
+    void vulkan_frame_ring::end_frame()
+    {
+        ended_frame_index_ = started_frame_index_;
+    }
+
+    vk_timeline_semaphore_handle vulkan_frame_ring::frame_slot_semaphore() const noexcept
+    {
+        return frame_slot_semaphore_;
     }
 
     std::uint32_t vulkan_frame_ring::frames_in_flight() const noexcept
     {
-        return static_cast<std::uint32_t>(frame_fences_.size());
+        return kFramesInFlight_;
     }
 
     void vulkan_frame_ring::drain_slot(std::uint32_t const frame_index)
@@ -162,7 +134,8 @@ namespace vkgc
         drain_one<vk_object_tags::image>(slot_pending);
         drain_one<vk_object_tags::buffer>(slot_pending);
         drain_one<vk_object_tags::allocation>(slot_pending);
-        drain_one<vk_object_tags::semaphore>(slot_pending);
+        drain_one<vk_object_tags::bin_semaphore>(slot_pending);
+        drain_one<vk_object_tags::timeline_semaphore>(slot_pending);
         drain_one<vk_object_tags::fence>(slot_pending);
     }
 }

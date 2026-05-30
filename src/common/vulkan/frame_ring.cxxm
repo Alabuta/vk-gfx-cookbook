@@ -24,31 +24,30 @@ export namespace vkgc
         vulkan_frame_ring& operator=(vulkan_frame_ring const&) = delete;
         vulkan_frame_ring& operator=(vulkan_frame_ring&&) = delete;
 
-        // Waits the current slot's fence (signaled by the previous frame that
-        // used this slot). Drains that slot's pending-destroy queue. Resets
-        // the fence. Returns the slot index for recording.
-        std::uint32_t begin_frame();
+        // Waits the timeline semaphore for the frame that previously used this
+        // slot (frame_index - frames_in_flight) to complete, then drains that
+        // slot's pending-destroy queue. Returns the slot index for recording.
+        std::uint32_t begin_frame(std::uint64_t frame_index);
 
-        // Advances the cursor after vkQueueSubmit so subsequent defer_destroy
-        // calls land on the NEXT frame's queue.
+        // Marks the started frame as ended (records its index so the
+        // destructor can wait the timeline up to it). Does not rotate the slot
+        // cursor; the slot is chosen in begin_frame via frame_index modulo.
         void end_frame();
 
         [[nodiscard]]
-        vk_fence_handle current_frame_fence() const noexcept;
-
-        [[nodiscard]]
-        std::uint32_t current_frame_index() const noexcept;
+        vk_timeline_semaphore_handle frame_slot_semaphore() const noexcept;
 
         [[nodiscard]]
         std::uint32_t frames_in_flight() const noexcept;
 
         // Enqueue a handle for destruction at the end of the current frame slot.
         // The actual destroy() runs the next time begin_frame() rotates
-        // back to this slot (i.e. after its fence signals).
+        // back to this slot (i.e. after the timeline semaphore reaches the
+        // value signaled by the frame that used the slot).
         template <typename Tag>
         void defer_destroy(vk_object_handle<Tag> const handle)
         {
-            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(slot_pending_[current_frame_index_].vectors);
+            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(slot_pending_[frame_slot_index_].vectors);
             bucket.push_back(handle);
         }
 
@@ -62,7 +61,8 @@ export namespace vkgc
                 std::vector<vk_buffer_handle>,
                 std::vector<vk_allocation_handle>,
                 std::vector<vk_fence_handle>,
-                std::vector<vk_semaphore_handle>,
+                std::vector<vk_bin_semaphore_handle>,
+                std::vector<vk_timeline_semaphore_handle>,
                 std::vector<vk_command_pool_handle>,
                 std::vector<vk_command_buffer_handle>
             > vectors;
@@ -70,9 +70,16 @@ export namespace vkgc
 
         vulkan_object_registry& object_registry_;
 
-        std::vector<vk_fence_handle> frame_fences_{};
         std::vector<pending> slot_pending_{};
-        std::uint32_t current_frame_index_{0};
+
+        vk_timeline_semaphore_handle frame_slot_semaphore_;
+
+        std::uint32_t const kFramesInFlight_;
+
+        std::uint64_t started_frame_index_{0};
+        std::uint64_t ended_frame_index_{0};
+
+        std::uint32_t frame_slot_index_{0};
 
         template <typename Tag>
         void drain_one(pending& slot_pending)

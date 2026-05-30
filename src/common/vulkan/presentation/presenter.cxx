@@ -237,9 +237,9 @@ namespace vkgc
             return;
         }
 
-        if (!VKGC_ENSURE(create_image_acquired_semaphores(frames_in_flight)))
+        if (!VKGC_ENSURE(create_semaphores(frames_in_flight, static_cast<std::uint32_t>(swapchain_images_.size()))))
         {
-            destroy_image_acquired_semaphores();
+            destroy_semaphores();
 
             vkDestroySwapchainKHR(device_.handle(), swapchain_handle_, nullptr);
             swapchain_handle_ = VK_NULL_HANDLE;
@@ -258,7 +258,7 @@ namespace vkgc
 
         VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_handle));
 
-        destroy_image_acquired_semaphores();
+        destroy_semaphores();
 
         if (swapchain_handle_ != VK_NULL_HANDLE)
         {
@@ -306,16 +306,21 @@ namespace vkgc
             return std::unexpected{present_status::out_of_date};
         }
 
-        auto image_acquired = object_registry_.resolve_handle(image_acquired_semaphores_[frame_index]);
+        VKGC_VERIFY(frame_index < image_acquired_semaphores_.size());
+        auto image_acquired = image_acquired_semaphores_[frame_index];
+        auto image_acquired_raw = object_registry_.resolve_handle(image_acquired);
+        if (!VKGC_ENSURE_VKHANDLE(image_acquired_raw))
+        {
+            return std::unexpected{present_status::error};
+        }
 
-        std::uint32_t image_index{0};
-        VkResult const result = vkAcquireNextImageKHR(
+        auto const result = vkAcquireNextImageKHR(
             device_.handle(),
             swapchain_handle_,
             std::numeric_limits<std::uint64_t>::max(),
-            image_acquired,
+            image_acquired_raw,
             VK_NULL_HANDLE,
-            &image_index);
+            &acquired_image_index_);
 
         if (result == VK_ERROR_OUT_OF_DATE_KHR)
         {
@@ -331,14 +336,29 @@ namespace vkgc
             return std::unexpected{present_status::error};
         }
 
+        VKGC_VERIFY(acquired_image_index_ < present_semaphores_.size());
+        auto present_semaphore = present_semaphores_[acquired_image_index_];
+        if (!VKGC_ENSURE(present_semaphore.is_valid()))
+        {
+            return std::unexpected{present_status::error};
+        }
+
         return swapchain_image_acquire_result{
             .image_acquired{image_acquired},
-            .image_index{image_index}
+            .present_wait{present_semaphore},
+            .image_index{acquired_image_index_}
         };
     }
 
-    present_status vulkan_presenter::present(VkQueue queue, std::uint32_t const image_index, VkSemaphore wait_semaphore)
+    present_status vulkan_presenter::request_present(VkQueue queue)
     {
+        VKGC_VERIFY(acquired_image_index_ < present_semaphores_.size());
+        auto wait_semaphore = object_registry_.resolve_handle(present_semaphores_[acquired_image_index_]);
+        if (!VKGC_ENSURE_VKHANDLE(wait_semaphore))
+        {
+            return present_status::error;
+        }
+
         VkPresentInfoKHR const info{
             .sType{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR},
             .pNext{nullptr},
@@ -346,7 +366,7 @@ namespace vkgc
             .pWaitSemaphores{&wait_semaphore},
             .swapchainCount{1},
             .pSwapchains{&swapchain_handle_},
-            .pImageIndices{&image_index},
+            .pImageIndices{&acquired_image_index_},
             .pResults{nullptr}
         };
 
@@ -378,9 +398,7 @@ namespace vkgc
             return;
         }
 
-        auto const device_handle = device_.handle();
-
-        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_handle));
+        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_.handle()));
 
         swapchain_images_.clear();
 
@@ -388,7 +406,7 @@ namespace vkgc
 
         if (previous != VK_NULL_HANDLE)
         {
-            vkDestroySwapchainKHR(device_handle, previous, nullptr);
+            vkDestroySwapchainKHR(device_.handle(), previous, nullptr);
         }
 
         if (!VKGC_ENSURE_VKHANDLE(swapchain_handle_))
@@ -463,43 +481,38 @@ namespace vkgc
 
     void vulkan_presenter::query_swapchain_images()
     {
-        auto const device_handle = device_.handle();
+        if (!VKGC_ENSURE(device_.is_valid()))
+        {
+            return;
+        }
 
         std::uint32_t count{0};
-        if (auto const result = vkGetSwapchainImagesKHR(device_handle, swapchain_handle_, &count, nullptr);
-            result != VK_SUCCESS)
+        if (!VKGC_ENSURE_VKSUCCESS(vkGetSwapchainImagesKHR(device_.handle(), swapchain_handle_, &count, nullptr)))
         {
-            std::println(stderr, "[Vulkan] : Error : failed to query swapchain image count ({})", result);
             return;
         }
 
         swapchain_images_.resize(count);
 
-        if (auto const result = vkGetSwapchainImagesKHR(
-                device_handle,
+        if (!VKGC_ENSURE_VKSUCCESS(vkGetSwapchainImagesKHR(
+                device_.handle(),
                 swapchain_handle_,
                 &count,
-                swapchain_images_.data());
-            result != VK_SUCCESS)
+                swapchain_images_.data())))
         {
-            std::println(stderr, "[Vulkan] : Error : failed to query swapchain images ({})", result);
             swapchain_images_.clear();
         }
     }
 
-    bool vulkan_presenter::create_image_acquired_semaphores(std::uint32_t const count)
+    bool vulkan_presenter::create_semaphores(
+        std::uint32_t const image_acquired_count,
+        std::uint32_t const present_wait_count)
     {
-        VkSemaphoreCreateInfo constexpr semaphore_create_info{
-            .sType{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO},
-            .pNext{nullptr},
-            .flags{0}
-        };
-
-        image_acquired_semaphores_.reserve(count);
-
-        for (std::uint32_t i = 0; i < count; ++i)
+        image_acquired_semaphores_.reserve(image_acquired_count);
+        for (std::uint32_t i = 0; i < image_acquired_count; ++i)
         {
-            auto const semaphore = object_registry_.create_semaphore(semaphore_create_info);
+            auto const debug_name = std::format("image acquired semaphore [#{}]", i);
+            auto const semaphore = object_registry_.create_binary_semaphore(debug_name.c_str());
             if (!semaphore.is_valid())
             {
                 return false;
@@ -508,16 +521,33 @@ namespace vkgc
             image_acquired_semaphores_.push_back(semaphore);
         }
 
+        present_semaphores_.reserve(present_wait_count);
+        for (std::uint32_t i = 0; i < present_wait_count; ++i)
+        {
+            auto const debug_name = std::format("present wait semaphore [#{}]", i);
+            auto const semaphore = object_registry_.create_binary_semaphore(debug_name.c_str());
+            if (!semaphore.is_valid())
+            {
+                return false;
+            }
+
+            present_semaphores_.push_back(semaphore);
+        }
+
         return true;
     }
 
-    void vulkan_presenter::destroy_image_acquired_semaphores()
+    void vulkan_presenter::destroy_semaphores()
     {
-        for (auto const handle : image_acquired_semaphores_)
+        for (auto const& semaphores : {present_semaphores_, image_acquired_semaphores_})
         {
-            object_registry_.destroy_immediate(handle);
+            for (auto const handle : semaphores)
+            {
+                object_registry_.destroy_immediate(handle);
+            }
         }
 
+        present_semaphores_.clear();
         image_acquired_semaphores_.clear();
     }
 }

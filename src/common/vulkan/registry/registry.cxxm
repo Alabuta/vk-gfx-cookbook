@@ -45,10 +45,15 @@ export namespace vkgc
         vk_image_view_handle create_image_view(VkImageViewCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
-        vk_fence_handle create_fence(VkFenceCreateInfo const& info, char const* debug_name = "");
+        vk_fence_handle create_fence(bool create_signaled, char const* debug_name = "");
 
         [[nodiscard]]
-        vk_semaphore_handle create_semaphore(VkSemaphoreCreateInfo const& info, char const* debug_name = "");
+        vk_bin_semaphore_handle create_binary_semaphore(char const* debug_name = "");
+
+        [[nodiscard]]
+        vk_timeline_semaphore_handle create_timeline_semaphore(
+            std::uint64_t initial_value,
+            char const* debug_name = "");
 
         [[nodiscard]]
         vk_command_pool_handle create_command_pool(VkCommandPoolCreateInfo const& info, char const* debug_name = "");
@@ -113,7 +118,8 @@ export namespace vkgc
             vulkan_slot_map<vk_object_tags::buffer, buffer_payload>,
             vulkan_slot_map<vk_object_tags::allocation, allocation_payload>,
             vulkan_slot_map<vk_object_tags::fence, fence_payload>,
-            vulkan_slot_map<vk_object_tags::semaphore, semaphore_payload>,
+            vulkan_slot_map<vk_object_tags::bin_semaphore, semaphore_payload>,
+            vulkan_slot_map<vk_object_tags::timeline_semaphore, semaphore_payload>,
             vulkan_slot_map<vk_object_tags::command_pool, command_pool_payload>,
             vulkan_slot_map<vk_object_tags::command_buffer, command_buffer_payload>
         >;

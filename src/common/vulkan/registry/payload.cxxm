@@ -99,7 +99,13 @@ export namespace vkgc
     };
 
     template <>
-    struct vk_object_payload<vk_object_tags::semaphore>
+    struct vk_object_payload<vk_object_tags::bin_semaphore>
+    {
+        using type = semaphore_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::timeline_semaphore>
     {
         using type = semaphore_payload;
     };

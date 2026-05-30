@@ -46,7 +46,8 @@ export namespace vkgc
 
     struct swapchain_image_acquire_result
     {
-        VkSemaphore image_acquired{VK_NULL_HANDLE};
+        vk_bin_semaphore_handle image_acquired{};
+        vk_bin_semaphore_handle present_wait{};
         std::uint32_t image_index{0};
     };
 
@@ -105,7 +106,7 @@ export namespace vkgc
         std::expected<swapchain_image_acquire_result, present_status> acquire_image(std::uint32_t frame_index);
 
         [[nodiscard]]
-        present_status present(VkQueue queue, std::uint32_t image_index, VkSemaphore wait_semaphore);
+        present_status request_present(VkQueue queue);
 
         // vkDeviceWaitIdle, then destroy the previous swapchain and rebuild
         // (using oldSwapchain). image_acquired_semaphores_ are untouched
@@ -137,14 +138,18 @@ export namespace vkgc
         VkExtent2D surface_extent_{};
 
         std::vector<VkImage> swapchain_images_{};
+        std::uint32_t acquired_image_index_{0};
 
-        std::vector<vk_semaphore_handle> image_acquired_semaphores_{};
+        std::vector<vk_bin_semaphore_handle> image_acquired_semaphores_{};
+        std::vector<vk_bin_semaphore_handle> present_semaphores_{};
 
         bool needs_rebuild_{false};
 
         void create_swapchain(VkSurfaceKHR surface, VkSwapchainKHR old_handle, swapchain_params const& swapchain_params);
+
         void query_swapchain_images();
-        bool create_image_acquired_semaphores(std::uint32_t count);
-        void destroy_image_acquired_semaphores();
+
+        bool create_semaphores(std::uint32_t image_acquired_count, std::uint32_t present_wait_count);
+        void destroy_semaphores();
     };
 }

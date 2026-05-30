@@ -28,7 +28,7 @@ import vkgc.vulkan_frame_ring;
 
 namespace vkgc
 {
-    std::uint32_t constexpr max_frames_in_flight{2};
+    std::uint32_t constexpr kFramesInFlight{2}; // belongs to renderer settings
 }
 
 [[nodiscard]]
@@ -218,7 +218,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         vulkan_device,
         vk_object_registry,
         window_surface.handle(),
-        vkgc::max_frames_in_flight,
+        vkgc::kFramesInFlight,
         swapchain_params
     };
     VKGC_VERIFY(presenter.is_valid());
@@ -243,31 +243,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return false;
     }
 
-    vkgc::vulkan_frame_ring frame_ring{vk_object_registry, vkgc::max_frames_in_flight};
-
-    // vkQueueSubmit set them signaled when submitted commands execution is done and then vkQueuePresentKHR becomes allowed
-    std::vector<vkgc::vk_semaphore_handle> execution_complete_semaphores;
-    {
-        execution_complete_semaphores.reserve(presenter.image_count());
-
-        VkSemaphoreCreateInfo constexpr semaphore_create_info{
-            .sType{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO},
-            .pNext{nullptr},
-            .flags{0}
-        };
-
-        for (std::uint32_t i = 0; i < presenter.image_count(); ++i)
-        {
-            auto const debug_name = std::format("frame execution complete semaphore [#{}]", i);
-            if (auto const semaphore = vk_object_registry.create_semaphore(semaphore_create_info, debug_name.c_str());
-                semaphore.is_valid())
-            {
-                execution_complete_semaphores.push_back(semaphore);
-            }
-        }
-
-        VKGC_VERIFY(presenter.image_count() == execution_complete_semaphores.size());
-    }
+    vkgc::vulkan_frame_ring frame_ring{vk_object_registry, vkgc::kFramesInFlight};
 
     auto const main_queue_command_pool = vk_object_registry.create_command_pool({
         .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
@@ -282,7 +258,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     auto const command_buffers = vk_object_registry.allocate_command_buffers(
         main_queue_command_pool,
-        vkgc::max_frames_in_flight,
+        vkgc::kFramesInFlight,
         true);
     if (command_buffers.empty())
     {
@@ -379,8 +355,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return true;
     };
 
-    vkgc::update_app([&]
+    std::uint32_t frame_index{vkgc::kFramesInFlight};
+
+    vkgc::update_loop([&]
     {
+        VKGC_CHECKF(
+            frame_index >= vkgc::kFramesInFlight,
+            "frame index has to be greater or equal to frames-in-flight number");
+
         if (window.should_close())
         {
             return false;
@@ -402,16 +384,22 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return true;
         }
 
-        std::uint32_t const frame_index = frame_ring.begin_frame();
+        std::uint32_t const frame_slot_index = frame_ring.begin_frame(frame_index);
         if (!VKGC_ENSUREF(
-            frame_index != std::numeric_limits<std::uint32_t>::max(),
-            "failed to begin [#{}] frame",
-            frame_index))
+            frame_slot_index != std::numeric_limits<std::uint32_t>::max(),
+            "failed to begin [#{}] frame slot",
+            frame_slot_index))
         {
             return false;
         }
 
-        auto const acquired = presenter.acquire_image(frame_index);
+        auto const frame_slot_semaphore = vk_object_registry.resolve_handle(frame_ring.frame_slot_semaphore());
+        if (!VKGC_ENSURE_VKHANDLE(frame_slot_semaphore))
+        {
+            return false;
+        }
+
+        auto const acquired = presenter.acquire_image(frame_slot_index);
         if (!acquired.has_value())
         {
             VKGC_VERIFYF(
@@ -423,15 +411,22 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 "unexpected error occurred while acquiring the swapchain image");
         }
 
-        auto const [swapchain_image_acquired_semaphore, swapchain_image_index] = acquired.value();
+        auto [swapchain_image_acquired_semaphore, present_wait_semaphore, swapchain_image_index] = acquired.value();
 
-        auto const current_frame_fence = vk_object_registry.resolve_handle(frame_ring.current_frame_fence());
-        if (!VKGC_ENSURE_VKHANDLE(current_frame_fence))
+        auto const swapchain_image_acquired_semaphore_raw = vk_object_registry.resolve_handle(
+            swapchain_image_acquired_semaphore);
+        if (!VKGC_ENSURE_VKHANDLE(swapchain_image_acquired_semaphore_raw))
         {
             return false;
         }
 
-        auto const command_buffer = vk_object_registry.resolve_handle(command_buffers[frame_index]);
+        auto const present_wait_semaphore_raw = vk_object_registry.resolve_handle(present_wait_semaphore);
+        if (!VKGC_ENSURE_VKHANDLE(present_wait_semaphore_raw))
+        {
+            return false;
+        }
+
+        auto const command_buffer = vk_object_registry.resolve_handle(command_buffers[frame_slot_index]);
         if (!VKGC_ENSURE_VKHANDLE(command_buffer))
         {
             return false;
@@ -439,7 +434,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         if (!VKGC_ENSUREF_VKSUCCESS(
             vkResetCommandBuffer(command_buffer, 0),
-            "failed to reset [#{}] frame render command buffer", frame_index))
+            "failed to reset [#{}] frame render command buffer", frame_slot_index))
         {
             return false;
         }
@@ -454,7 +449,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
             if (!VKGC_ENSUREF_VKSUCCESS(
                 vkBeginCommandBuffer(command_buffer, &begin_info),
-                "failed to begin [#{}] frame render command buffer record", frame_index))
+                "failed to begin [#{}] frame render command buffer record", frame_slot_index))
             {
                 return false;
             }
@@ -568,23 +563,21 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         if (!VKGC_ENSUREF_VKSUCCESS(
             vkEndCommandBuffer(command_buffer),
-            "failed to end [#{}] frame render command buffer record", frame_index))
+            "failed to end [#{}] frame render command buffer record", frame_slot_index))
         {
             return false;
         }
 
-        auto const execution_complete_semaphore = vk_object_registry.resolve_handle(
-            execution_complete_semaphores[swapchain_image_index]);
-        VKGC_VERIFY(execution_complete_semaphore);
-
         {
-            VkSemaphoreSubmitInfo const wait_semaphore_info{
-                .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
-                .pNext{nullptr},
-                .semaphore{swapchain_image_acquired_semaphore},
-                .value{0},
-                .stageMask{VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT},
-                .deviceIndex{0}
+            std::array const wait_semaphores_submit_info{
+                VkSemaphoreSubmitInfo{
+                    .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
+                    .pNext{nullptr},
+                    .semaphore{swapchain_image_acquired_semaphore_raw},
+                    .value{0},
+                    .stageMask{VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT},
+                    .deviceIndex{0}
+                }
             };
 
             VkCommandBufferSubmitInfo const command_buffer_info{
@@ -594,35 +587,47 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 .deviceMask{0}
             };
 
-            VkSemaphoreSubmitInfo const signal_semaphore_info{
-                .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
-                .pNext{nullptr},
-                .semaphore{execution_complete_semaphore},
-                .value{0},
-                .stageMask{VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT},
-                .deviceIndex{0}
+            std::array const signal_semaphores_info{
+                VkSemaphoreSubmitInfo{
+                    .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
+                    .pNext{nullptr},
+                    .semaphore{frame_slot_semaphore},
+                    .value{frame_index},
+                    .stageMask{VK_PIPELINE_STAGE_ALL_COMMANDS_BIT},
+                    .deviceIndex{0}
+                },
+                VkSemaphoreSubmitInfo{
+                    .sType{VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO},
+                    .pNext{nullptr},
+                    .semaphore{present_wait_semaphore_raw},
+                    .value{0},
+                    .stageMask{VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT},
+                    .deviceIndex{0}
+                }
             };
 
             VkSubmitInfo2 const submit_info{
                 .sType{VK_STRUCTURE_TYPE_SUBMIT_INFO_2},
                 .pNext{nullptr},
                 .flags{0},
-                .waitSemaphoreInfoCount{1},
-                .pWaitSemaphoreInfos{&wait_semaphore_info},
+                .waitSemaphoreInfoCount{static_cast<std::uint32_t>(wait_semaphores_submit_info.size())},
+                .pWaitSemaphoreInfos{wait_semaphores_submit_info.data()},
                 .commandBufferInfoCount{1},
                 .pCommandBufferInfos{&command_buffer_info},
-                .signalSemaphoreInfoCount{1},
-                .pSignalSemaphoreInfos{&signal_semaphore_info}
+                .signalSemaphoreInfoCount{static_cast<std::uint32_t>(signal_semaphores_info.size())},
+                .pSignalSemaphoreInfos{signal_semaphores_info.data()}
             };
 
             VKGC_VERIFYF_VKSUCCESS(
-                vkQueueSubmit2(vulkan_device.main_queue(), 1, &submit_info, current_frame_fence),
-                "failed to submit [#{}] frame render command buffer", frame_index);
+                vkQueueSubmit2(vulkan_device.main_queue(), 1, &submit_info, VK_NULL_HANDLE),
+                "failed to submit [#{}] frame render command buffer", frame_slot_index);
         }
 
         frame_ring.end_frame();
 
-        switch (presenter.present(vulkan_device.main_queue(), swapchain_image_index, execution_complete_semaphore))
+        ++frame_index;
+
+        switch (presenter.request_present(vulkan_device.main_queue()))
         {
         case vkgc::present_status::ok:
             break;

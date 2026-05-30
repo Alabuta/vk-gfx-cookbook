@@ -48,7 +48,8 @@ namespace vkgc
         drain_pool_in_destructor<vk_object_tags::image>();
         drain_pool_in_destructor<vk_object_tags::buffer>();
         drain_pool_in_destructor<vk_object_tags::allocation>();
-        drain_pool_in_destructor<vk_object_tags::semaphore>();
+        drain_pool_in_destructor<vk_object_tags::bin_semaphore>();
+        drain_pool_in_destructor<vk_object_tags::timeline_semaphore>();
         drain_pool_in_destructor<vk_object_tags::fence>();
     }
 
@@ -165,10 +166,17 @@ namespace vkgc
         });
     }
 
-    vk_fence_handle vulkan_object_registry::create_fence(VkFenceCreateInfo const& info, char const* debug_name)
+    vk_fence_handle vulkan_object_registry::create_fence(bool const create_signaled, char const* debug_name)
     {
+        VkFenceCreateInfo const create_info
+        {
+            .sType{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{create_signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags{}}
+        };
+
         VkFence handle{VK_NULL_HANDLE};
-        if (auto const result = vkCreateFence(device_.handle(), &info, nullptr, &handle);
+        if (auto const result = vkCreateFence(device_.handle(), &create_info, nullptr, &handle);
             result != VK_SUCCESS)
         {
             std::println(stderr, "[Vulkan] : Error : failed to create fence ({})", result);
@@ -180,21 +188,63 @@ namespace vkgc
         return slot_map<vk_object_tags::fence>().insert(fence_payload{.handle{handle}});
     }
 
-    vk_semaphore_handle vulkan_object_registry::create_semaphore(
-        VkSemaphoreCreateInfo const& info,
-        char const* debug_name)
+    vk_bin_semaphore_handle vulkan_object_registry::create_binary_semaphore(char const* debug_name)
     {
+        VkSemaphoreTypeCreateInfo constexpr type_create_info{
+            .sType{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO},
+            .pNext{nullptr},
+            .semaphoreType{VK_SEMAPHORE_TYPE_BINARY},
+            .initialValue{0}
+        };
+
+        VkSemaphoreCreateInfo const create_info{
+            .sType{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO},
+            .pNext{&type_create_info},
+            .flags{0}
+        };
+
         VkSemaphore handle{VK_NULL_HANDLE};
-        if (auto const result = vkCreateSemaphore(device_.handle(), &info, nullptr, &handle);
+        if (auto const result = vkCreateSemaphore(device_.handle(), &create_info, nullptr, &handle);
             result != VK_SUCCESS)
         {
-            std::println(stderr, "[Vulkan] : Error : failed to create semaphore ({})", result);
+            std::println(stderr, "[Vulkan] : Error : failed to create binary semaphore ({})", result);
             return {};
         }
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::semaphore>().insert(semaphore_payload{.handle{handle}});
+        return slot_map<vk_object_tags::bin_semaphore>().insert(semaphore_payload{.handle{handle}});
+    }
+
+    vk_timeline_semaphore_handle vulkan_object_registry::create_timeline_semaphore(
+        std::uint64_t const initial_value,
+        char const* debug_name)
+    {
+        VkSemaphoreTypeCreateInfo const type_create_info{
+            .sType{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO},
+            .pNext{nullptr},
+            .semaphoreType{VK_SEMAPHORE_TYPE_TIMELINE},
+            .initialValue{initial_value}
+        };
+
+        VkSemaphoreCreateInfo const create_info{
+            .sType{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO},
+            .pNext{&type_create_info},
+            .flags{0}
+        };
+
+        VkSemaphore handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreateSemaphore(device_.handle(), &create_info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create timeline semaphore ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
+
+        return slot_map<vk_object_tags::timeline_semaphore>().insert(semaphore_payload{.handle{handle}});
+
     }
 
     vk_command_pool_handle vulkan_object_registry::create_command_pool(

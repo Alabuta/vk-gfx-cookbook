@@ -3,7 +3,6 @@ module;
 #include <algorithm>
 #include <array>
 #include <print>
-#include <ranges>
 
 #include <volk.h>
 
@@ -48,6 +47,7 @@ namespace
         &VkPhysicalDeviceVulkan12Features::descriptorBindingPartiallyBound,
         &VkPhysicalDeviceVulkan12Features::descriptorBindingVariableDescriptorCount,
         &VkPhysicalDeviceVulkan12Features::runtimeDescriptorArray,
+        &VkPhysicalDeviceVulkan12Features::timelineSemaphore,
         &VkPhysicalDeviceVulkan12Features::bufferDeviceAddress
     };
 
