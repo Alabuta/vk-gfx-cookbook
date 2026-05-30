@@ -39,7 +39,7 @@ namespace vkgc
         VKGC_VERIFYF_VKSUCCESS(volkInitialize(), "'volk' meta-loader initialization failed");
     }
 
-    void update_app(std::function<bool()> const& callback)
+    void update_loop(std::function<bool()> const& callback)
     {
         bool continue_app_run{true};
         while (continue_app_run)

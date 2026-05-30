@@ -14,7 +14,7 @@ int main()
 
         while (!window.should_close())
         {
-            vkgc::update_app(nullptr);
+            vkgc::update_loop(nullptr);
         }
     }
 
