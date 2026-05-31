@@ -355,10 +355,12 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return true;
     };
 
-    std::uint32_t frame_index{vkgc::kFramesInFlight};
+    std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
 
     vkgc::update_loop([&]
     {
+        // Begin render loop
+
         VKGC_CHECKF(
             frame_index >= vkgc::kFramesInFlight,
             "frame index has to be greater or equal to frames-in-flight number");
@@ -580,11 +582,13 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 }
             };
 
-            VkCommandBufferSubmitInfo const command_buffer_info{
-                .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
-                .pNext{nullptr},
-                .commandBuffer{command_buffer},
-                .deviceMask{0}
+            std::array const command_buffer_submit_info{
+                VkCommandBufferSubmitInfo{
+                   .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
+                   .pNext{nullptr},
+                   .commandBuffer{command_buffer},
+                   .deviceMask{0}
+               }
             };
 
             std::array const signal_semaphores_info{
@@ -612,8 +616,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 .flags{0},
                 .waitSemaphoreInfoCount{static_cast<std::uint32_t>(wait_semaphores_submit_info.size())},
                 .pWaitSemaphoreInfos{wait_semaphores_submit_info.data()},
-                .commandBufferInfoCount{1},
-                .pCommandBufferInfos{&command_buffer_info},
+                .commandBufferInfoCount{static_cast<std::uint32_t>(command_buffer_submit_info.size())},
+                .pCommandBufferInfos{command_buffer_submit_info.data()},
                 .signalSemaphoreInfoCount{static_cast<std::uint32_t>(signal_semaphores_info.size())},
                 .pSignalSemaphoreInfos{signal_semaphores_info.data()}
             };
@@ -645,6 +649,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             VKGC_VERIFYF(false, "unexpected error occurred while presenting to the swapchain");
             break;
         }
+
+        // End render loop
 
         glfwPollEvents();
         return true;
