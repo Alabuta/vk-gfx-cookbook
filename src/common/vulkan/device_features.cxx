@@ -47,6 +47,7 @@ namespace
         &VkPhysicalDeviceVulkan12Features::descriptorBindingPartiallyBound,
         &VkPhysicalDeviceVulkan12Features::descriptorBindingVariableDescriptorCount,
         &VkPhysicalDeviceVulkan12Features::runtimeDescriptorArray,
+        &VkPhysicalDeviceVulkan12Features::scalarBlockLayout,
         &VkPhysicalDeviceVulkan12Features::timelineSemaphore,
         &VkPhysicalDeviceVulkan12Features::bufferDeviceAddress
     };
