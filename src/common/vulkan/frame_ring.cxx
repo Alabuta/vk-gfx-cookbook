@@ -20,7 +20,7 @@ namespace vkgc
     {
         VKGC_CHECK(kFramesInFlight_ > 1);
 
-        slot_pending_.resize(kFramesInFlight_);
+        pending_queue_slots_.resize(kFramesInFlight_);
 
         frame_slot_semaphore_ = object_registry_.create_timeline_semaphore(0, "frame slot semaphore");
         VKGC_VERIFY(frame_slot_semaphore_.is_valid());
@@ -50,14 +50,14 @@ namespace vkgc
                 vkWaitSemaphores(device_handle, &wait_info, std::numeric_limits<std::uint64_t>::max()));
         }
 
-        for (std::uint32_t slot_index = 0; slot_index < slot_pending_.size(); ++slot_index)
+        for (std::uint32_t slot_index = 0; slot_index < pending_queue_slots_.size(); ++slot_index)
         {
             drain_slot(slot_index);
         }
 
-        object_registry_.destroy_immediate(frame_slot_semaphore_);
+        pending_queue_slots_.clear();
 
-        slot_pending_.clear();
+        object_registry_.destroy_immediate(frame_slot_semaphore_);
     }
 
     std::uint32_t vulkan_frame_ring::begin_frame(std::uint64_t const frame_index)
@@ -118,24 +118,20 @@ namespace vkgc
         return kFramesInFlight_;
     }
 
-    void vulkan_frame_ring::drain_slot(std::uint32_t const frame_index)
+    void vulkan_frame_ring::drain_slot(std::uint32_t const slot_index)
     {
-        if (frame_index >= slot_pending_.size())
+        if (!VKGC_ENSURE(slot_index < pending_queue_slots_.size()))
         {
             return;
         }
 
-        pending& slot_pending = slot_pending_[frame_index];
+        auto& queue = pending_queue_slots_[slot_index];
 
-        // Match the destruction order used by ~vulkan_object_registry.
-        drain_one<vk_object_tags::command_buffer>(slot_pending);
-        drain_one<vk_object_tags::command_pool>(slot_pending);
-        drain_one<vk_object_tags::image_view>(slot_pending);
-        drain_one<vk_object_tags::image>(slot_pending);
-        drain_one<vk_object_tags::buffer>(slot_pending);
-        drain_one<vk_object_tags::allocation>(slot_pending);
-        drain_one<vk_object_tags::bin_semaphore>(slot_pending);
-        drain_one<vk_object_tags::timeline_semaphore>(slot_pending);
-        drain_one<vk_object_tags::fence>(slot_pending);
+        using T = std::remove_reference_t<decltype(queue.buckets)>;
+
+        [this, &queue]<std::size_t... I>(std::index_sequence<I...>)
+        {
+            ((drain_one<typename std::tuple_element_t<I, T>::value_type::TypeTag>(queue)), ...);
+        }(std::make_index_sequence<std::tuple_size_v<T>>{});
     }
 }

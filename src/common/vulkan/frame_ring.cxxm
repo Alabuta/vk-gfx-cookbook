@@ -47,30 +47,31 @@ export namespace vkgc
         template <typename Tag>
         void defer_destroy(vk_object_handle<Tag> const handle)
         {
-            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(slot_pending_[frame_slot_index_].vectors);
+            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(pending_queue_slots_[frame_slot_index_].buckets);
             bucket.push_back(handle);
         }
 
     private:
 
-        struct pending
+        struct pending_queue
         {
+            // Match the declaration order with destruction order used by ~vulkan_object_registry.
             std::tuple<
-                std::vector<vk_image_handle>,
+                std::vector<vk_command_buffer_handle>,
+                std::vector<vk_command_pool_handle>,
                 std::vector<vk_image_view_handle>,
+                std::vector<vk_image_handle>,
                 std::vector<vk_buffer_handle>,
                 std::vector<vk_allocation_handle>,
-                std::vector<vk_fence_handle>,
                 std::vector<vk_bin_semaphore_handle>,
                 std::vector<vk_timeline_semaphore_handle>,
-                std::vector<vk_command_pool_handle>,
-                std::vector<vk_command_buffer_handle>
-            > vectors;
+                std::vector<vk_fence_handle>
+            > buckets;
         };
 
         vulkan_object_registry& object_registry_;
 
-        std::vector<pending> slot_pending_{};
+        std::vector<pending_queue> pending_queue_slots_{};
 
         vk_timeline_semaphore_handle frame_slot_semaphore_;
 
@@ -81,10 +82,12 @@ export namespace vkgc
 
         std::uint32_t frame_slot_index_{0};
 
+        void drain_slot(std::uint32_t slot_index);
+
         template <typename Tag>
-        void drain_one(pending& slot_pending)
+        void drain_one(pending_queue& queue)
         {
-            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(slot_pending.vectors);
+            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(queue.buckets);
             for (auto const handle : bucket)
             {
                 object_registry_.destroy_immediate(handle);
@@ -92,7 +95,5 @@ export namespace vkgc
 
             bucket.clear();
         }
-
-        void drain_slot(std::uint32_t frame_index);
     };
 }
