@@ -350,7 +350,7 @@ namespace vkgc
         };
     }
 
-    present_status vulkan_presenter::request_present(VkQueue queue)
+    present_status vulkan_presenter::request_presentation(VkQueue queue)
     {
         VKGC_VERIFY(acquired_image_index_ < present_semaphores_.size());
         auto wait_semaphore = object_registry_.resolve_handle(present_semaphores_[acquired_image_index_]);

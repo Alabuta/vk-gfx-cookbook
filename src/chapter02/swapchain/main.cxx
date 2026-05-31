@@ -627,7 +627,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         ++frame_index;
 
-        switch (presenter.request_present(vulkan_device.main_queue()))
+        switch (presenter.request_presentation(vulkan_device.main_queue()))
         {
         case vkgc::present_status::ok:
             break;

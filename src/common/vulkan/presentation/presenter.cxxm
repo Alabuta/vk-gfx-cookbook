@@ -106,7 +106,7 @@ export namespace vkgc
         std::expected<swapchain_image_acquire_result, present_status> acquire_image(std::uint32_t frame_index);
 
         [[nodiscard]]
-        present_status request_present(VkQueue queue);
+        present_status request_presentation(VkQueue queue);
 
         // vkDeviceWaitIdle, then destroy the previous swapchain and rebuild
         // (using oldSwapchain). image_acquired_semaphores_ are untouched
