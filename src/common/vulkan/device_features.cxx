@@ -60,7 +60,12 @@ namespace
     };
 
     std::array constexpr kRequiredVk14Features{
-        &VkPhysicalDeviceVulkan14Features::pushDescriptor
+        &VkPhysicalDeviceVulkan14Features::pushDescriptor,
+        &VkPhysicalDeviceVulkan14Features::maintenance5
+    };
+
+    std::array constexpr kRequiredShaderObjectFeature{
+        &VkPhysicalDeviceShaderObjectFeaturesEXT::shaderObject
     };
 
     [[nodiscard]]
@@ -79,7 +84,8 @@ namespace
             VkPhysicalDeviceVulkan11Features{.sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES}},
             VkPhysicalDeviceVulkan12Features{.sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES}},
             VkPhysicalDeviceVulkan13Features{.sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES}},
-            VkPhysicalDeviceVulkan14Features{.sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES}}
+            VkPhysicalDeviceVulkan14Features{.sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES}},
+            VkPhysicalDeviceShaderObjectFeaturesEXT{.sType{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_OBJECT_FEATURES_EXT}}
         };
 #if defined(__GNUC__) || defined(__GNUG__)
 #pragma GCC diagnostic pop
@@ -91,13 +97,14 @@ namespace
     template <class C, class V>
     void visit_required_feature_sets(C& features_chain, V&& visit)
     {
-        static_assert(C::Size == 5, "Chain shape changed - update visit_required_feature_sets");
+        static_assert(C::Size == 6, "Chain shape changed - update visit_required_feature_sets");
 
         visit(features_chain.template get<0>().features, kRequiredVk10Features, "VkPhysicalDeviceFeatures");
         visit(features_chain.template get<1>(), kRequiredVk11Features, "VkPhysicalDeviceVulkan11Features");
         visit(features_chain.template get<2>(), kRequiredVk12Features, "VkPhysicalDeviceVulkan12Features");
         visit(features_chain.template get<3>(), kRequiredVk13Features, "VkPhysicalDeviceVulkan13Features");
         visit(features_chain.template get<4>(), kRequiredVk14Features, "VkPhysicalDeviceVulkan14Features");
+        visit(features_chain.template get<5>(), kRequiredShaderObjectFeature, "VkPhysicalDeviceShaderObjectFeaturesEXT");
     }
 }
 

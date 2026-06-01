@@ -24,7 +24,8 @@ import vkgc.vulkan_device_features;
 namespace
 {
     std::array constexpr kVulkanDeviceDefaultExtensions{
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_SHADER_OBJECT_EXTENSION_NAME
     };
 
     [[nodiscard]]
