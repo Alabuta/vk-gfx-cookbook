@@ -7,9 +7,9 @@
 #include <utility>
 #include <vector>
 
+#include "volk.h"
 #include <vk_mem_alloc.h>
 
-#include "volk.h"
 #include "GLFW/glfw3.h"
 
 #include "vulkan/format.hxx"
@@ -231,7 +231,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             presenter.request_rebuild();
         });
 
-    VkExtent2D const swapchain_image_extent = presenter.extent();
+    auto const [surface_width, surface_height] = presenter.surface_extent();
 
     auto swapchain_image_view_handles = create_swapchain_image_views(
         vk_object_registry,
@@ -298,7 +298,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     if (!create_depth_attachment(
         vk_object_registry,
         depth_attachment_format,
-        {.width{swapchain_image_extent.width}, .height{swapchain_image_extent.height}, .depth{1}},
+        {.width{surface_width}, .height{surface_height}, .depth{1}},
         depth_attachment_image,
         depth_attachment_image_memory,
         depth_attachment_image_view))
@@ -343,7 +343,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         if (!create_depth_attachment(
             vk_object_registry,
             depth_attachment_format,
-            {.width{swapchain_image_extent.width}, .height{swapchain_image_extent.height}, .depth{1}},
+            {.width{surface_width}, .height{surface_height}, .depth{1}},
             depth_attachment_image,
             depth_attachment_image_memory,
             depth_attachment_image_view))
@@ -413,7 +413,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 "unexpected error occurred while acquiring the swapchain image");
         }
 
-        auto [swapchain_image_acquired_semaphore, present_wait_semaphore, swapchain_image_index] = acquired.value();
+        auto [swapchain_image_acquired_semaphore, present_wait_semaphore, swapchain_image] = acquired.value();
 
         auto const swapchain_image_acquired_semaphore_raw = vk_object_registry.resolve_handle(
             swapchain_image_acquired_semaphore);
@@ -476,7 +476,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                     .newLayout{VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL},
                     .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                     .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                    .image{presenter.images()[swapchain_image_index]},
+                    .image{swapchain_image},
                     .subresourceRange{
                         .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
                         .baseMipLevel{0},
@@ -538,7 +538,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 .newLayout{VK_IMAGE_LAYOUT_PRESENT_SRC_KHR},
                 .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                 .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                .image{presenter.images()[swapchain_image_index]},
+                .image{swapchain_image},
                 .subresourceRange{
                     .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
                     .baseMipLevel{0},
@@ -631,6 +631,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         ++frame_index;
 
+        // End render loop
+
         switch (presenter.request_presentation(vulkan_device.main_queue()))
         {
         case vkgc::present_status::ok:
@@ -649,8 +651,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             VKGC_VERIFYF(false, "unexpected error occurred while presenting to the swapchain");
             break;
         }
-
-        // End render loop
 
         glfwPollEvents();
         return true;
