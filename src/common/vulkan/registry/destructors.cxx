@@ -49,4 +49,9 @@ namespace vkgc
     {
         vkFreeCommandBuffers(device_.handle(), payload.source_pool, 1, &payload.handle);
     }
+
+    void vulkan_object_registry::destroy_payload(shader_payload const& payload) noexcept
+    {
+        vkDestroyShaderEXT(device_.handle(), payload.handle, nullptr);
+    }
 }

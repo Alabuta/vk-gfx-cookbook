@@ -15,6 +15,7 @@ export namespace vkgc::vk_object_tags
     struct timeline_semaphore{};
     struct command_pool{};
     struct command_buffer{};
+    struct shader{};
 }
 
 export namespace vkgc
@@ -43,4 +44,5 @@ export namespace vkgc
     using vk_timeline_semaphore_handle = vk_object_handle<vk_object_tags::timeline_semaphore>;
     using vk_command_pool_handle = vk_object_handle<vk_object_tags::command_pool>;
     using vk_command_buffer_handle = vk_object_handle<vk_object_tags::command_buffer>;
+    using vk_shader_handle = vk_object_handle<vk_object_tags::shader>;
 }

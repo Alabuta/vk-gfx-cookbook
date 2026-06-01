@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <tuple>
 #include <vector>
+#include <span>
 
 #include <volk.h>
 #include "vk_mem_alloc.h"
@@ -16,6 +17,14 @@ export import vkgc.vulkan_payload;
 
 export namespace vkgc
 {
+    struct shader_create_info
+    {
+        VkShaderStageFlagBits stage{};
+        VkShaderStageFlags next_stage{0};
+        char const* entry_point{nullptr};
+        char const* debug_name{""};
+    };
+
     class vulkan_object_registry final
     {
     public:
@@ -63,6 +72,11 @@ export namespace vkgc
             vk_command_pool_handle pool,
             std::uint32_t count,
             bool is_primary);
+
+        [[nodiscard]]
+        std::vector<vk_shader_handle> create_shaders(
+            std::span<shader_create_info const> infos,
+            std::span<std::byte const> shader_code);
 
         // Resolve the underlying Vulkan object from a handle. Returns VK_NULL_HANDLE-of-T for stale handles.
         template <typename Tag>
@@ -121,7 +135,8 @@ export namespace vkgc
             vulkan_slot_map<vk_object_tags::bin_semaphore, semaphore_payload>,
             vulkan_slot_map<vk_object_tags::timeline_semaphore, semaphore_payload>,
             vulkan_slot_map<vk_object_tags::command_pool, command_pool_payload>,
-            vulkan_slot_map<vk_object_tags::command_buffer, command_buffer_payload>
+            vulkan_slot_map<vk_object_tags::command_buffer, command_buffer_payload>,
+            vulkan_slot_map<vk_object_tags::shader, shader_payload>
         >;
 
         vulkan_device const& device_;
@@ -157,5 +172,6 @@ export namespace vkgc
         void destroy_payload(semaphore_payload const& payload) noexcept;
         void destroy_payload(command_pool_payload const& payload) noexcept;
         void destroy_payload(command_buffer_payload const& payload) noexcept;
+        void destroy_payload(shader_payload const& payload) noexcept;
     };
 }

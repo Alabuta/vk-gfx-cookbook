@@ -62,6 +62,11 @@ export namespace vkgc
         bool is_primary{false};
     };
 
+    struct shader_payload
+    {
+        VkShaderEXT handle{VK_NULL_HANDLE};
+    };
+
     /*
      * Tag -> Payload mapping.
      */
@@ -120,6 +125,12 @@ export namespace vkgc
     struct vk_object_payload<vk_object_tags::command_buffer>
     {
         using type = command_buffer_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::shader>
+    {
+        using type = shader_payload;
     };
 
     template <typename Tag>
