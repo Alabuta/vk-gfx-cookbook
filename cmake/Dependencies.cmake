@@ -2,6 +2,67 @@ include(FetchContent)
 
 find_package(Vulkan ${COOKBOOK_VULKAN_API_VERSION_MAJOR}.${COOKBOOK_VULKAN_API_VERSION_MINOR} REQUIRED)
 
+# === Slang === (shader compiler bundled in the Vulkan SDK; wrapped in the imported `Slang::Slang` target)
+# Slang is neither fetched nor built from source: the SDK that find_package(Vulkan) above resolves already
+# ships the compiler — headers under <sdk>/Include/slang, import libs under <sdk>/Lib, and the
+# slang.dll / slangd.dll runtimes under <sdk>/Bin (kept on PATH by the SDK installer). CMake's FindVulkan
+# exposes no `slang` component (only the glslang stack), so the pieces are located by hand here. The SDK
+# carries split debug (`slangd`) and release (`slang`) artifacts; both are mapped so a Debug configure links
+# the asserts-enabled build while RelWithDebInfo / Shipping fall through to the release one.
+find_path(VKGC_SLANG_INCLUDE_DIR
+        NAMES slang.h
+        HINTS
+            ${Vulkan_INCLUDE_DIR}
+            $ENV{VULKAN_SDK}/Include
+            $ENV{VULKAN_SDK}/include
+        PATH_SUFFIXES slang
+)
+
+find_library(VKGC_SLANG_LIBRARY_RELEASE
+        NAMES slang
+        HINTS
+            ${Vulkan_INCLUDE_DIR}/../Lib
+            $ENV{VULKAN_SDK}/Lib
+            $ENV{VULKAN_SDK}/lib
+)
+
+find_library(VKGC_SLANG_LIBRARY_DEBUG
+        NAMES slangd
+        HINTS
+            ${Vulkan_INCLUDE_DIR}/../Lib
+            $ENV{VULKAN_SDK}/Lib
+            $ENV{VULKAN_SDK}/lib
+)
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Slang
+        REQUIRED_VARS VKGC_SLANG_LIBRARY_RELEASE VKGC_SLANG_INCLUDE_DIR
+)
+
+mark_as_advanced(VKGC_SLANG_INCLUDE_DIR VKGC_SLANG_LIBRARY_RELEASE VKGC_SLANG_LIBRARY_DEBUG)
+
+# UNKNOWN IMPORTED keeps this cross-platform: on Windows the located file is slang's import .lib (the matching
+# slang.dll resolves at runtime via the SDK's Bin dir on PATH); on Linux/macOS it's the shared object itself.
+add_library(Slang::Slang UNKNOWN IMPORTED)
+# IMPORTED_LOCATION is the all-config fallback (used when no IMPORTED_LOCATION_<CONFIG> matches); the
+# maps funnel the non-Release build types onto the release artifact. When slangd is present we add the
+# per-config locations and re-point DEBUG at the debug build; otherwise everything stays on release.
+set_target_properties(Slang::Slang PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${VKGC_SLANG_INCLUDE_DIR}"
+        IMPORTED_LOCATION "${VKGC_SLANG_LIBRARY_RELEASE}"
+        MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+        MAP_IMPORTED_CONFIG_MINSIZEREL Release
+        MAP_IMPORTED_CONFIG_DEBUG Release
+)
+if (VKGC_SLANG_LIBRARY_DEBUG)
+    set_target_properties(Slang::Slang PROPERTIES
+            IMPORTED_CONFIGURATIONS "RELEASE;DEBUG"
+            IMPORTED_LOCATION_RELEASE "${VKGC_SLANG_LIBRARY_RELEASE}"
+            IMPORTED_LOCATION_DEBUG "${VKGC_SLANG_LIBRARY_DEBUG}"
+            MAP_IMPORTED_CONFIG_DEBUG Debug
+    )
+endif ()
+
 # Every declaration carries:
 #   * GIT_SHALLOW TRUE — depth-1 clone; all GIT_TAGs are real tags (not SHAs), so shallow is valid
 #                       and cuts cold-configure time meaningfully for large repos (glslang especially).

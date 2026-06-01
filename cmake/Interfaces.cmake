@@ -116,9 +116,14 @@ target_link_libraries(vkgc_dependencies_concurrency
 
 
 # === vkgc::dependencies::shaders ===
-# glslang's GLSL→SPIR-V compiler stack; the three targets link together: glslang is the
-# parser/frontend, SPIRV emits SPIR-V from its AST, and glslang-default-resource-limits provides
-# the default TBuiltInResource for parsing.
+# The shader-compilation toolchain. Two independent front ends live here:
+#   * glslang's GLSL→SPIR-V stack — three targets that link together: glslang is the parser/frontend,
+#     SPIRV emits SPIR-V from its AST, and glslang-default-resource-limits provides the default
+#     TBuiltInResource for parsing.
+#   * Slang (Slang::Slang, from the Vulkan SDK) — the cookbook's primary shader language; compiles
+#     Slang sources to SPIR-V through its own global-session API.
+# Kept in one target because chapters reach for "the shader compiler" as a unit; split into
+# vkgc::dependencies::{glslang,slang} if a chapter ever needs exactly one and paying for both bites.
 
 add_library(vkgc_dependencies_shaders INTERFACE)
 add_library(vkgc::dependencies::shaders ALIAS vkgc_dependencies_shaders)
@@ -128,6 +133,7 @@ target_link_libraries(vkgc_dependencies_shaders
         SPIRV
         glslang
         glslang-default-resource-limits
+        Slang::Slang
 )
 
 

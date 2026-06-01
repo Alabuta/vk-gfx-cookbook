@@ -96,6 +96,7 @@ For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCM
 | Taskflow | 4.0.0 | FetchContent (GitHub) |
 | sigslot | 1.2.2 | FetchContent (GitHub) — exposes `Pal::Sigslot` |
 | glslang | 16.2.0 | FetchContent (GitHub) — `ENABLE_OPT=OFF` to skip the SPIRV-Tools bootstrap |
+| Slang | bundled | Vulkan SDK — located by hand (FindVulkan has no `slang` component), wrapped in imported `Slang::Slang` |
 | X11 | system | Required on Linux only |
 
 ## Compiler Configuration
