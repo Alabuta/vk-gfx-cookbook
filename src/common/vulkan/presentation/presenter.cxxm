@@ -48,7 +48,7 @@ export namespace vkgc
     {
         vk_bin_semaphore_handle image_acquired{};
         vk_bin_semaphore_handle present_wait{};
-        std::uint32_t image_index{0};
+        VkImage swapchain_image{};
     };
 
     enum class present_status
@@ -94,7 +94,7 @@ export namespace vkgc
         VkSurfaceFormatKHR surface_format() const noexcept;
 
         [[nodiscard]]
-        VkExtent2D extent() const noexcept;
+        VkExtent2D surface_extent() const noexcept;
 
         // Acquires the next swapchain image using the slot-indexed
         // image_acquired_semaphores_[frame_index]. Returns the unexpected

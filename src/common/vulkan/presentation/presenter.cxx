@@ -292,7 +292,7 @@ namespace vkgc
         return surface_format_;
     }
 
-    VkExtent2D vulkan_presenter::extent() const noexcept
+    VkExtent2D vulkan_presenter::surface_extent() const noexcept
     {
         return surface_extent_;
     }
@@ -343,10 +343,12 @@ namespace vkgc
             return std::unexpected{present_status::error};
         }
 
+        VKGC_VERIFY(acquired_image_index_ < swapchain_images_.size());
+
         return swapchain_image_acquire_result{
             .image_acquired{image_acquired},
             .present_wait{present_semaphore},
-            .image_index{acquired_image_index_}
+            .swapchain_image{swapchain_images_[acquired_image_index_]}
         };
     }
 
