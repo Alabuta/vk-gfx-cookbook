@@ -5,6 +5,7 @@ module;
 #include <limits>
 #include <new>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 export module vkgc.vulkan_slot_map;
@@ -25,6 +26,7 @@ export namespace vkgc
      *   - nothrow_default_constructible: `Payload{}` in slot_t default-init and
      *     in release()'s return cannot throw, so insert/release stay
      *     noexcept-friendly.
+     *   - is_aggregate: `Payload{}` is
      *   - sizeof/alignof >= std::uint32_t: empty slots store a next-free index
      *     in a union with the payload (see slot_t below), so the payload bytes
      *     must be wide enough and properly aligned to host a std::uint32_t.
@@ -34,6 +36,7 @@ export namespace vkgc
         std::is_trivially_copyable_v<T> &&
         std::is_trivially_destructible_v<T> &&
         std::is_nothrow_default_constructible_v<T> &&
+        std::is_aggregate_v<T> &&
         sizeof(T) >= sizeof(std::uint32_t) &&
         alignof(T) >= alignof(std::uint32_t);
 
@@ -54,19 +57,26 @@ export namespace vkgc
         [[nodiscard]]
         vk_object_handle<Tag> insert(Payload payload)
         {
+            return emplace(payload);
+        }
+
+        template <typename... Args>
+        [[nodiscard]]
+        vk_object_handle<Tag> emplace(Args&&... args)
+        {
             std::uint32_t slot_index{0};
 
             if (head_free_ != no_free_slot)
             {
                 slot_index = head_free_;
                 head_free_ = slots_[slot_index].next_free;
-                ::new (static_cast<void*>(&slots_[slot_index].payload)) Payload{payload};
+                ::new (static_cast<void*>(&slots_[slot_index].payload)) Payload{std::forward<Args>(args)...};
             }
             else
             {
                 slot_index = static_cast<std::uint32_t>(slots_.size());
                 slots_.emplace_back();
-                slots_[slot_index].payload = payload;
+                slots_[slot_index].payload = Payload{std::forward<Args>(args)...};
             }
 
             slot_t& slot = slots_[slot_index];

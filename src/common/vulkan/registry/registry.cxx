@@ -65,20 +65,20 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::image>().insert(image_payload{
-            .handle{handle},
-            .format{info.format},
-            .extent{info.extent},
-            .mip_levels{info.mipLevels},
-            .array_layers{info.arrayLayers}
-        });
+        return slot_map<vk_object_tags::image>().emplace(
+            handle,
+            info.format,
+            info.extent,
+            info.mipLevels,
+            info.arrayLayers
+        );
     }
 
     vk_allocation_handle vulkan_object_registry::allocate_image_memory(
         vk_image_handle const image,
         VmaAllocationCreateInfo const& alloc_info)
     {
-        VkImage const image_handle = resolve_handle(image);
+        auto const image_handle = resolve_handle(image);
         if (!VKGC_ENSURE_VKHANDLE(image_handle))
         {
             return {};
@@ -98,7 +98,7 @@ namespace vkgc
             return {};
         }
 
-        return slot_map<vk_object_tags::allocation>().insert(allocation_payload{.handle{allocation}});
+        return slot_map<vk_object_tags::allocation>().emplace(allocation);
     }
 
     vk_buffer_handle vulkan_object_registry::create_buffer(VkBufferCreateInfo const& info, char const* debug_name)
@@ -113,18 +113,14 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_BUFFER, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::buffer>().insert(buffer_payload{
-            .handle{handle},
-            .size{info.size},
-            .usage{info.usage}
-        });
+        return slot_map<vk_object_tags::buffer>().emplace(handle, info.size, info.usage);
     }
 
     vk_allocation_handle vulkan_object_registry::allocate_buffer_memory(
         vk_buffer_handle buffer,
         VmaAllocationCreateInfo const& alloc_info)
     {
-        VkBuffer buffer_handle = resolve_handle(buffer);
+        auto const buffer_handle = resolve_handle(buffer);
         if (!VKGC_ENSURE_VKHANDLE(buffer_handle))
         {
             return {};
@@ -143,7 +139,7 @@ namespace vkgc
             return {};
         }
 
-        return slot_map<vk_object_tags::allocation>().insert(allocation_payload{.handle{allocation}});
+        return slot_map<vk_object_tags::allocation>().emplace(allocation);
     }
 
     vk_image_view_handle vulkan_object_registry::create_image_view(
@@ -160,10 +156,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE_VIEW, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::image_view>().insert(image_view_payload{
-            .handle{handle},
-            .format{info.format}
-        });
+        return slot_map<vk_object_tags::image_view>().emplace(handle, info.format);
     }
 
     vk_fence_handle vulkan_object_registry::create_fence(bool const create_signaled, char const* debug_name)
@@ -185,7 +178,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_FENCE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::fence>().insert(fence_payload{.handle{handle}});
+        return slot_map<vk_object_tags::fence>().emplace(handle);
     }
 
     vk_bin_semaphore_handle vulkan_object_registry::create_binary_semaphore(char const* debug_name)
@@ -213,7 +206,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::bin_semaphore>().insert(semaphore_payload{.handle{handle}});
+        return slot_map<vk_object_tags::bin_semaphore>().emplace(handle);
     }
 
     vk_timeline_semaphore_handle vulkan_object_registry::create_timeline_semaphore(
@@ -243,7 +236,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::timeline_semaphore>().insert(semaphore_payload{.handle{handle}});
+        return slot_map<vk_object_tags::timeline_semaphore>().emplace(handle);
 
     }
 
@@ -261,10 +254,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_COMMAND_POOL, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::command_pool>().insert(command_pool_payload{
-            .handle{handle},
-            .queue_family_index{info.queueFamilyIndex}
-        });
+        return slot_map<vk_object_tags::command_pool>().emplace(handle, info.queueFamilyIndex);
     }
 
     std::vector<vk_command_buffer_handle> vulkan_object_registry::allocate_command_buffers(
@@ -272,7 +262,7 @@ namespace vkgc
         std::uint32_t const count,
         bool const is_primary)
     {
-        VkCommandPool command_pool_handle = resolve_handle(pool);
+        auto const command_pool_handle = resolve_handle(pool);
         if (!VKGC_ENSURE_VKHANDLE(command_pool_handle))
         {
             return {};
@@ -304,11 +294,7 @@ namespace vkgc
             std::back_inserter(handles),
             [command_pool_handle, is_primary, &vulkan_slot_map](VkCommandBuffer raw_handle)
             {
-                return vulkan_slot_map.insert(command_buffer_payload{
-                    .handle{raw_handle},
-                    .source_pool{command_pool_handle},
-                    .is_primary{is_primary}
-                });
+                return vulkan_slot_map.emplace(raw_handle, command_pool_handle, is_primary);
             });
 
         return handles;
