@@ -64,6 +64,16 @@ namespace
         std::int32_t const id = callback_data->messageIdNumber;
         char const* const message = callback_data->pMessage ? callback_data->pMessage : "";
 
+        // Loader messages of any severity come from the host environment — third-party
+        // implicit/explicit layers (OBS, RTSS, Steam, EOS) or dangling registry entries
+        // left by uninstalled apps — never from our use of Vulkan. Skip them so a broken
+        // layer install on the machine can't spam output or trip the debug break below.
+        if ((message_types & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) &&
+            std::strcmp(id_name, "Loader Message") == 0)
+        {
+            return VK_FALSE;
+        }
+
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
         {
             std::println(stderr, "[Vulkan] : Error : [#{}:{}] {}", id, id_name, message);
