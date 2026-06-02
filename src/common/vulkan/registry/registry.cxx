@@ -166,7 +166,7 @@ namespace vkgc
         {
             .sType{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO},
             .pNext{nullptr},
-            .flags{create_signaled ? VK_FENCE_CREATE_SIGNALED_BIT : VkFenceCreateFlags{}}
+            .flags{create_signaled ? static_cast<VkFenceCreateFlags>(VK_FENCE_CREATE_SIGNALED_BIT) : VkFenceCreateFlags{}}
         };
 
         VkFence handle{VK_NULL_HANDLE};
@@ -308,7 +308,7 @@ namespace vkgc
         VKGC_CHECKF(
             !shader_code.empty() && shader_code.size() % sizeof(std::uint32_t) == 0, "invalid byte code buffer size");
 
-        VKGC_CHECK((reinterpret_cast<std::uintptr_t>(shader_code.data()) & alignof(std::uint32_t) - 1) == 0);
+        VKGC_CHECK((reinterpret_cast<std::uintptr_t>(shader_code.data()) & (alignof(std::uint32_t) - 1)) == 0);
 
         std::vector<VkShaderCreateInfoEXT> shader_create_infos;
         shader_create_infos.reserve(infos.size());

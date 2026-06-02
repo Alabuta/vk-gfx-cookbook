@@ -73,7 +73,7 @@ namespace vkgc
             return std::numeric_limits<std::uint32_t>::max();
         }
 
-        frame_slot_index_ = frame_index % kFramesInFlight_;
+        frame_slot_index_ = static_cast<std::uint32_t>(frame_index % kFramesInFlight_);
 
         {
             std::uint64_t const wait_value = frame_index - kFramesInFlight_;
