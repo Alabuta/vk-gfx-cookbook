@@ -407,17 +407,18 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return false;
         }
 
+        // slangc chapter02_triangle.slang -profile spirv_1_5 -target spirv -o chapter02_triangle.spv
         std::array create_info{
             vkgc::shader_create_info{
                 .stage{VK_SHADER_STAGE_VERTEX_BIT},
                 .next_stage{VK_SHADER_STAGE_FRAGMENT_BIT},
-                .entry_point{"vs_main"},
+                .entry_point{"main"},
                 .debug_name{"triangle.vs"}
             },
             vkgc::shader_create_info{
                 .stage{VK_SHADER_STAGE_FRAGMENT_BIT},
                 .next_stage{0},
-                .entry_point{"ps_main"},
+                .entry_point{"main"},
                 .debug_name{"triangle.ps"}
             }
         };
