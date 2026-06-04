@@ -39,6 +39,42 @@ namespace vkgc
         memory_properties_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
         vkGetPhysicalDeviceMemoryProperties2(physical_device_, &memory_properties_);
 
+        auto const& device_memory_properties = memory_properties_.memoryProperties;
+
+        {
+            // ReBAR: device-local + host-visible heap larger than the standard 256 MiB BAR window.
+            static VkDeviceSize constexpr kRebarMinHeap{256ULL * 1024ULL * 1024ULL};
+
+            auto const& [memory_types_count, memory_types, _, memory_heaps] = device_memory_properties;
+
+            for (std::uint32_t i = 0; i < memory_types_count; ++i)
+            {
+                auto const [property_flags, heap_index] = memory_types[i];
+
+                auto constexpr kRequiredMemProp =
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+
+                if ((property_flags & kRequiredMemProp) != kRequiredMemProp)
+                {
+                    continue;
+                }
+
+                auto const [heap_size, heap_flags] = memory_heaps[heap_index];
+                if ((heap_flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) == 0 || heap_size <= kRebarMinHeap)
+                {
+                    continue;
+                }
+
+                // Prefer HOST_COHERENT among candidates (avoids explicit flushes).
+                bool const is_coherent = (property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
+                bool const have_candidate  = rebar_memory_type_index_ != std::numeric_limits<std::uint32_t>::max();
+                if (!have_candidate || is_coherent)
+                {
+                    rebar_memory_type_index_ = i;
+                }
+            }
+        }
+
         auto constexpr invalid_queue_family_index = std::numeric_limits<std::uint32_t>::max();
 
         vkGetDeviceQueue(handle_, queue_families_.main, 0, &main_queue_);
@@ -79,6 +115,25 @@ namespace vkgc
         else
         {
             std::println("[Vulkan] : Log : no dedicated DMA transfer queue; main queue must be used for transfer");
+        }
+
+        if (rebar_memory_type_index_ != std::numeric_limits<std::uint32_t>::max())
+        {
+            auto const heap_index = device_memory_properties.memoryTypes[rebar_memory_type_index_].heapIndex;
+            auto const property_flags = device_memory_properties.memoryTypes[rebar_memory_type_index_].propertyFlags;
+            auto const heap_mib = device_memory_properties.memoryHeaps[heap_index].size / (1024ULL * 1024ULL);
+
+            bool const is_coherent = (property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0;
+
+            std::println(
+                "[Vulkan] : Log : ReBAR available - memory type index {} (heap {} MiB{})",
+                rebar_memory_type_index_,
+                heap_mib,
+                is_coherent ? ", coherent" : "");
+        }
+        else
+        {
+            std::println("[Vulkan] : Log : ReBAR not available; no large device-local host-visible heap detected");
         }
     }
 
@@ -125,6 +180,16 @@ namespace vkgc
     VkPhysicalDeviceMemoryProperties const& vulkan_device::memory_properties() const noexcept
     {
         return memory_properties_.memoryProperties;
+    }
+
+    bool vulkan_device::has_rebar() const noexcept
+    {
+        return rebar_memory_type_index_ != std::numeric_limits<std::uint32_t>::max();
+    }
+
+    std::uint32_t vulkan_device::rebar_memory_type_index() const noexcept
+    {
+        return rebar_memory_type_index_;
     }
 
     VmaAllocator vulkan_device::vma_allocator() const noexcept

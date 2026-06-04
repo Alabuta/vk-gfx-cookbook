@@ -53,6 +53,13 @@ export namespace vkgc
         [[nodiscard]] VkPhysicalDeviceProperties const& properties() const noexcept;
         [[nodiscard]] VkPhysicalDeviceMemoryProperties const& memory_properties() const noexcept;
 
+        // True when a device-local, host-visible heap larger than the standard 256 MiB BAR window
+        // is present, i.e. the driver exposes ReBAR / Smart Access Memory.
+        [[nodiscard]] bool has_rebar() const noexcept;
+        // Index of the preferred ReBAR memory type (DEVICE_LOCAL | HOST_VISIBLE [| HOST_COHERENT]).
+        // Only meaningful when has_rebar() == true.
+        [[nodiscard]] std::uint32_t rebar_memory_type_index() const noexcept;
+
         [[nodiscard]] VmaAllocator vma_allocator() const noexcept;
 
         [[nodiscard]] VkQueue main_queue() const noexcept;
@@ -72,6 +79,8 @@ export namespace vkgc
         VkDevice handle_{VK_NULL_HANDLE};
 
         vulkan_queue_families queue_families_{};
+
+        std::uint32_t rebar_memory_type_index_{std::numeric_limits<std::uint32_t>::max()};
 
         VmaAllocator vma_allocator_{VK_NULL_HANDLE};
 
