@@ -52,6 +52,7 @@ namespace vkgc
         drain_pool_in_destructor<vk_object_tags::timeline_semaphore>();
         drain_pool_in_destructor<vk_object_tags::fence>();
         drain_pool_in_destructor<vk_object_tags::shader>();
+        drain_pool_in_destructor<vk_object_tags::shader_module>();
     }
 
     vk_image_handle vulkan_object_registry::create_image(VkImageCreateInfo const& info, char const* debug_name)
@@ -353,14 +354,55 @@ namespace vkgc
         std::vector<vk_shader_handle> shaders;
         shaders.reserve(shader_create_infos.size());
 
-        for (auto [handle, debug_name] :
-             std::views::zip(shader_handles, infos | std::views::transform(&shader_create_info::debug_name)))
+        for (auto [handle, info] : std::views::zip(shader_handles, infos))
         {
-            shaders.push_back(slot_map<vk_object_tags::shader>().emplace(handle));
-            device_.set_debug_object_name(VK_OBJECT_TYPE_SHADER_EXT, std::bit_cast<std::uint64_t>(handle), debug_name);
+            shaders.push_back(slot_map<vk_object_tags::shader>().emplace(handle, info.stage));
+            device_.set_debug_object_name(
+                VK_OBJECT_TYPE_SHADER_EXT,
+                std::bit_cast<std::uint64_t>(handle),
+                info.debug_name);
         }
 
         return shaders;
+    }
+
+    std::vector<vk_shader_handle> vulkan_object_registry::create_shader_modules(
+        std::span<shader_module_create_info const> infos,
+        std::span<std::byte const> shader_code)
+    {
+        VKGC_CHECKF(
+            !shader_code.empty() && shader_code.size() % sizeof(std::uint32_t) == 0, "invalid byte code buffer size");
+
+        VKGC_CHECK((reinterpret_cast<std::uintptr_t>(shader_code.data()) & (alignof(std::uint32_t) - 1)) == 0);
+
+        std::vector<VkShaderModuleCreateInfo> shader_module_create_infos;
+        shader_module_create_infos.reserve(infos.size());
+
+        std::ranges::transform(
+            infos,
+            std::back_inserter(shader_module_create_infos),
+            [shader_code](shader_module_create_info const& info)
+        {
+            return VkShaderCreateInfoEXT{
+                .sType{VK_STRUCTURE_TYPE_SHADER_CREATE_INFO_EXT},
+                .pNext{nullptr},
+                .flags{0},
+                .stage{info.stage},
+                .nextStage{info.next_stage},
+                .codeType{VK_SHADER_CODE_TYPE_SPIRV_EXT}, // :TODO: cache VK_SHADER_CODE_TYPE_BINARY_EXT
+                .codeSize{static_cast<std::uint32_t>(shader_code.size())},
+                .pCode{reinterpret_cast<std::uint32_t const*>(shader_code.data())},
+                .pName{info.entry_point},
+                .setLayoutCount{0},
+                .pSetLayouts{nullptr},
+                .pushConstantRangeCount{0},
+                .pPushConstantRanges{nullptr},
+                .pSpecializationInfo{nullptr}
+            };
+        });
+
+        std::vector<VkShaderModule> shader_module_handles(shader_module_create_infos.size());
+
     }
 
     VkFormat vulkan_object_registry::image_format(vk_image_handle handle) const noexcept
