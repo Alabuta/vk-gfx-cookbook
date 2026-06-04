@@ -184,11 +184,10 @@ static bool create_depth_attachment(
 }
 
 template <typename T>
-static std::vector<T> load_binary_file(std::string_view const file_name)
+static std::vector<T> load_binary_file(std::filesystem::path const &path)
 {
     namespace fs = std::filesystem;
 
-    fs::path const path = fs::path{kCacheDir} / file_name;
     std::ifstream file{path, std::ios::in | std::ios::binary | std::ios::ate};
 
     if (file.fail())
@@ -401,8 +400,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
 
     {
-        auto spirv_words = load_binary_file<std::uint32_t>("chapter02_triangle.spv");
-        if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader file"))
+        std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter02_triangle.spv"};
+        auto spirv_words = load_binary_file<std::uint32_t>(path);
+        if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
         {
             return false;
         }
@@ -423,20 +423,20 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             }
         };
 
-        auto shader_handles = vk_object_registry.create_shaders(create_info, std::as_bytes(std::span{spirv_words}));
-        if (!VKGC_ENSUREF(!shader_handles.empty(), "failed to create shaders"))
+        auto shaders = vk_object_registry.create_shaders(create_info, std::as_bytes(std::span{spirv_words}));
+        if (!VKGC_ENSUREF(!shaders.empty(), "failed to create shaders [{}]", path.string()))
         {
             return false;
         }
 
-        /*vkgc::vulkan_extending_structs_chain pipeline_shader_stage_chain{
+        vkgc::vulkan_extending_structs_chain pipeline_shader_stage_chain{
             VkPipelineShaderStageCreateInfo{
                 .sType{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
                 .pNext{nullptr},
                 .flags{0},
                 .stage{VK_SHADER_STAGE_VERTEX_BIT},
                 .module{VK_NULL_HANDLE},
-                .pName{"vs_main"},
+                .pName{"main"},
                 .pSpecializationInfo{nullptr}
             },
             VkPipelineShaderStageCreateInfo{
@@ -445,7 +445,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 .flags{0},
                 .stage{VK_SHADER_STAGE_FRAGMENT_BIT},
                 .module{VK_NULL_HANDLE},
-                .pName{"ps_main"},
+                .pName{"main"},
                 .pSpecializationInfo{nullptr}
             },
             VkShaderModuleCreateInfo{
@@ -455,7 +455,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 .codeSize{std::size(bytecode)},
                 .pCode{reinterpret_cast<std::uint32_t const *>(bytecode.data())}
             }
-        };*/
+        };
     }
 
     vkgc::update_loop([&]
