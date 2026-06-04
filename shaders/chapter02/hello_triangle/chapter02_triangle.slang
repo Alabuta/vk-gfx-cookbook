@@ -17,7 +17,7 @@ struct v2p
 };
 
 [shader("vertex")]
-v2p vs_main(uint vertex_index : SV_VertexID)
+v2p main(uint vertex_index : SV_VertexID)
 {
     v2p output;
     output.position = float4(position[vertex_index], 0.0, 1.0);
@@ -26,7 +26,7 @@ v2p vs_main(uint vertex_index : SV_VertexID)
 }
 
 [shader("pixel")]
-float4 ps_main(v2p input) : SV_Target
+float4 main(v2p input) : SV_Target
 {
     return float4(input.color, 1.0);
 }
