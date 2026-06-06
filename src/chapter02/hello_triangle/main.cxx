@@ -10,7 +10,7 @@
 #include <fstream>
 #include <filesystem>
 
-#include "volk.h"
+#include <volk.h>
 #include <vk_mem_alloc.h>
 
 #include "GLFW/glfw3.h"
@@ -18,7 +18,7 @@
 #include "vulkan/format.hxx"
 #include "vulkan/assert.hxx"
 
-#include <algorithm>
+#include <ranges>
 
 // constexpr std::string_view kShaderDir = COOKBOOK_SHADER_DIR_STRING;
 constexpr std::string_view kCacheDir = COOKBOOK_CACHE_DIR_STRING;
@@ -41,12 +41,12 @@ namespace vkgc
 }
 
 [[nodiscard]]
-static std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
+static std::unordered_map<VkImage, vkgc::vk_image_view_handle> create_swapchain_image_views(
     vkgc::vulkan_object_registry& vk_object_registry,
     std::span<VkImage const> const images,
     VkFormat const format)
 {
-    std::vector<vkgc::vk_image_view_handle> image_view_handles;
+    std::unordered_map<VkImage, vkgc::vk_image_view_handle> image_view_handles;
     image_view_handles.reserve(images.size());
 
     for (std::uint32_t i{0}; auto image_handle : images)
@@ -76,11 +76,11 @@ static std::vector<vkgc::vk_image_view_handle> create_swapchain_image_views(
         auto const debug_name = std::format("swapchain image [#{}]", i++);
         if (auto const view = vk_object_registry.create_image_view(create_info, debug_name.c_str()); view.is_valid())
         {
-            image_view_handles.push_back(view);
+            image_view_handles.emplace(image_handle, view);
             continue;
         }
 
-        for (auto const image_view_handle : image_view_handles)
+        for (auto const image_view_handle : image_view_handles | std::views::values)
         {
             vk_object_registry.destroy_immediate(image_view_handle);
         }
@@ -184,7 +184,7 @@ static bool create_depth_attachment(
 }
 
 template <typename T>
-static std::vector<T> load_binary_file(std::filesystem::path const &path)
+static std::vector<T> load_binary_file(std::filesystem::path const& path)
 {
     namespace fs = std::filesystem;
 
@@ -218,7 +218,7 @@ static std::vector<T> load_binary_file(std::filesystem::path const &path)
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
 {
-    vkgc::vulkan_instance vulkan_instance{{ .enable_validation{true} }};
+    vkgc::vulkan_instance vulkan_instance{{.enable_validation{true}}};
     VKGC_VERIFY(vulkan_instance.is_valid());
 
     vkgc::window window{"Swapchain example", width, height};
@@ -236,11 +236,13 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     vkgc::vulkan_object_registry vk_object_registry{vulkan_device};
 
     vkgc::swapchain_params swapchain_params{
-        .preferred_surface_formats{ // display settings
+        .preferred_surface_formats{
+            // display settings
             {.format{VK_FORMAT_B8G8R8A8_SRGB}, .colorSpace{VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}},
             {.format{VK_FORMAT_R8G8B8A8_SRGB}, .colorSpace{VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}}
         },
-        .preferred_present_modes{ // display settings
+        // display settings
+        .preferred_present_modes{
 #if (VKGC_DEBUG_VULKAN == 0)
             VK_PRESENT_MODE_MAILBOX_KHR,
 #endif
@@ -249,10 +251,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         },
         .framebuffer_extent{.width{width}, .height{height}}, // display settings
         .min_image_count{2}, // renderer settings
-        .image_usage_flags{ // renderer settings
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-            VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT
+        .image_usage_flags{
+            // renderer settings
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT
         }
     };
 
@@ -316,12 +317,10 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .formatProperties{}
         };
 
-        vkGetPhysicalDeviceFormatProperties2(
-            vulkan_device.physical_device(),
-            preferred_depth_format,
-            &fmt_properties);
+        vkGetPhysicalDeviceFormatProperties2(vulkan_device.physical_device(), preferred_depth_format, &fmt_properties);
 
-        if ((fmt_properties.formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
+        auto const optimal_tiling_features = fmt_properties.formatProperties.optimalTilingFeatures;
+        if ((optimal_tiling_features & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
         {
             depth_attachment_format = preferred_depth_format;
             break;
@@ -362,7 +361,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         vk_object_registry.destroy_immediate(depth_attachment_image);
         vk_object_registry.destroy_immediate(depth_attachment_image_memory);
 
-        for (auto const image_view_handle : swapchain_image_view_handles)
+        for (auto const image_view_handle : swapchain_image_view_handles | std::views::values)
         {
             vk_object_registry.destroy_immediate(image_view_handle);
         }
@@ -399,16 +398,16 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
 
+    // slangc chapter02_triangle.slang -profile spirv_1_5 -target spirv -o chapter02_triangle.spv
+    std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter02_triangle.spv"};
+    auto spirv_words = load_binary_file<std::uint32_t>(path);
+    if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
     {
-        std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter02_triangle.spv"};
-        auto spirv_words = load_binary_file<std::uint32_t>(path);
-        if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
-        {
-            return false;
-        }
+        return false;
+    }
 
-        // slangc chapter02_triangle.slang -profile spirv_1_5 -target spirv -o chapter02_triangle.spv
-        std::array create_info{
+    {
+        /*std::array create_info{
             vkgc::shader_create_info{
                 .stage{VK_SHADER_STAGE_VERTEX_BIT},
                 .next_stage{VK_SHADER_STAGE_FRAGMENT_BIT},
@@ -427,35 +426,213 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         if (!VKGC_ENSUREF(!shaders.empty(), "failed to create shaders [{}]", path.string()))
         {
             return false;
-        }
+        }*/
+    }
 
-        vkgc::vulkan_extending_structs_chain pipeline_shader_stage_chain{
-            VkPipelineShaderStageCreateInfo{
-                .sType{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
-                .pNext{nullptr},
-                .flags{0},
-                .stage{VK_SHADER_STAGE_VERTEX_BIT},
-                .module{VK_NULL_HANDLE},
-                .pName{"main"},
-                .pSpecializationInfo{nullptr}
-            },
-            VkPipelineShaderStageCreateInfo{
-                .sType{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
-                .pNext{nullptr},
-                .flags{0},
-                .stage{VK_SHADER_STAGE_FRAGMENT_BIT},
-                .module{VK_NULL_HANDLE},
-                .pName{"main"},
-                .pSpecializationInfo{nullptr}
-            },
-            VkShaderModuleCreateInfo{
-                .sType{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO},
-                .pNext{nullptr},
-                .flags{0},
-                .codeSize{std::size(bytecode)},
-                .pCode{reinterpret_cast<std::uint32_t const *>(bytecode.data())}
-            }
+    auto const shader_code = std::as_bytes(std::span{spirv_words});
+    vkgc::vulkan_extending_structs_chain shader_vertex_stage{
+        VkPipelineShaderStageCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .stage{VK_SHADER_STAGE_VERTEX_BIT},
+            .module{VK_NULL_HANDLE},
+            .pName{"main"},
+            .pSpecializationInfo{nullptr}
+        },
+        VkShaderModuleCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .codeSize{static_cast<std::uint32_t>(shader_code.size())},
+            .pCode{reinterpret_cast<std::uint32_t const*>(shader_code.data())}
+        }
+    };
+
+    vkgc::vulkan_extending_structs_chain shader_fragment_stage{
+        VkPipelineShaderStageCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .stage{VK_SHADER_STAGE_FRAGMENT_BIT},
+            .module{VK_NULL_HANDLE},
+            .pName{"main"},
+            .pSpecializationInfo{nullptr}
+        },
+        VkShaderModuleCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .codeSize{static_cast<std::uint32_t>(shader_code.size())},
+            .pCode{reinterpret_cast<std::uint32_t const*>(shader_code.data())}
+        }
+    };
+
+    std::vector shader_stages{
+        *shader_vertex_stage.as_pointer(),
+        *shader_fragment_stage.as_pointer()
+    };
+
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_state{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .topology{VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST},
+        .primitiveRestartEnable{VK_FALSE}
+    };
+
+    struct vertex {
+        /*glm::vec3 pos;
+        glm::vec3 normal;
+        glm::vec2 uv;*/
+        float p[3];
+    };
+
+    std::array const binding_descriptions{
+        VkVertexInputBindingDescription{
+            .binding{0},
+            .stride{sizeof(vertex)},
+            .inputRate{VK_VERTEX_INPUT_RATE_VERTEX}
+       }
+    };
+
+    std::array constexpr attribute_descriptions{
+        VkVertexInputAttributeDescription{
+            .location{0},
+            .binding{0},
+            .format{VK_FORMAT_R32G32B32_SFLOAT},
+            .offset{0}
+        }
+        // { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, normal) },
+        // { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
+    };
+
+    VkPipelineVertexInputStateCreateInfo vertex_input_state{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .vertexBindingDescriptionCount{static_cast<std::uint32_t>(binding_descriptions.size())},
+        .pVertexBindingDescriptions{binding_descriptions.data()},
+        .vertexAttributeDescriptionCount{static_cast<std::uint32_t>(attribute_descriptions.size())},
+        .pVertexAttributeDescriptions{attribute_descriptions.data()}
+    };
+
+    VkPipelineLayout pipeline_layout;
+    {
+        VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+            .sType{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .setLayoutCount{0},
+            .pSetLayouts{nullptr},
+            .pushConstantRangeCount{0},
+            .pPushConstantRanges{nullptr}
         };
+
+        VKGC_VERIFY_VKSUCCESS(
+            vkCreatePipelineLayout(vulkan_device.handle(), &pipeline_layout_create_info, nullptr, &pipeline_layout));
+    }
+
+    VkPipelineViewportStateCreateInfo const viewport_state{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .viewportCount{1},
+        .pViewports{nullptr},
+        .scissorCount{1},
+        .pScissors{nullptr},
+    };
+
+    std::array constexpr dynamic_states{
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+    };
+
+    VkPipelineDynamicStateCreateInfo const pipeline_dynamic_state{
+       .sType{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO},
+       .pNext{nullptr},
+       .flags{0},
+       .dynamicStateCount{static_cast<std::uint32_t>(dynamic_states.size())},
+       .pDynamicStates{dynamic_states.data()}
+    };
+
+    VkPipelineDepthStencilStateCreateInfo const depth_stencil_state{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .depthTestEnable{VK_TRUE},
+        .depthWriteEnable{VK_TRUE},
+        .depthCompareOp{VK_COMPARE_OP_GREATER},
+        .depthBoundsTestEnable{VK_FALSE},
+        .stencilTestEnable{VK_FALSE},
+        .front{},
+        .back{},
+        .minDepthBounds{0.f},
+        .maxDepthBounds{1.f}
+    };
+
+    std::array const color_attachment_formats{presenter.surface_format().format};
+
+    VkPipelineRenderingCreateInfo pipeline_rendering_create_info{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO},
+        .pNext{nullptr},
+        .viewMask{0},
+        .colorAttachmentCount{static_cast<std::uint32_t>(color_attachment_formats.size())},
+        .pColorAttachmentFormats{color_attachment_formats.data()},
+        .depthAttachmentFormat{depth_attachment_format},
+        .stencilAttachmentFormat{VK_FORMAT_UNDEFINED}
+    };
+
+#if defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+    VkPipelineColorBlendAttachmentState blendAttachment{
+        .colorWriteMask = 0xF
+    };
+    VkPipelineColorBlendStateCreateInfo color_blend_state{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .attachmentCount = 1,
+        .pAttachments = &blendAttachment
+    };
+    VkPipelineRasterizationStateCreateInfo rasterization_state{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .lineWidth = 1.0f
+   };
+    VkPipelineMultisampleStateCreateInfo multisample_state{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT
+    };
+#if defined(__GNUC__) || defined(__GNUG__)
+#pragma GCC diagnostic pop
+#endif
+
+    VkPipeline pipeline;
+    {
+        VkGraphicsPipelineCreateInfo const create_info{
+            .sType{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO},
+            .pNext{&pipeline_rendering_create_info},
+            .flags{0}, // VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT
+            .stageCount{static_cast<std::uint32_t>(shader_stages.size())},
+            .pStages{shader_stages.data()},
+            .pVertexInputState{&vertex_input_state},
+            .pInputAssemblyState{&input_assembly_state},
+            .pTessellationState{nullptr},
+            .pViewportState{&viewport_state},
+            .pRasterizationState{&rasterization_state},
+            .pMultisampleState{&multisample_state},
+            .pDepthStencilState{&depth_stencil_state},
+            .pColorBlendState{&color_blend_state},
+            .pDynamicState{&pipeline_dynamic_state},
+            .layout{pipeline_layout},
+            .renderPass{VK_NULL_HANDLE},
+            .subpass{0},
+            .basePipelineHandle{VK_NULL_HANDLE},
+            .basePipelineIndex{-1}
+        };
+
+        VKGC_VERIFY_VKSUCCESS(
+            vkCreateGraphicsPipelines(vulkan_device.handle(), VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
     }
 
     vkgc::update_loop([&]
@@ -623,8 +800,83 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             vkCmdPipelineBarrier2(command_buffer, &dependency_info);
         }
 
+        auto const swapchain_image_view_handle = vk_object_registry.resolve_handle(
+            swapchain_image_view_handles[swapchain_image]);
+        if (!VKGC_ENSURE_VKHANDLE(swapchain_image_view_handle))
+        {
+            return false;
+        }
+
+        auto const depth_attachment_image_view_handle = vk_object_registry.resolve_handle(depth_attachment_image_view);
+        if (!VKGC_ENSURE_VKHANDLE(depth_attachment_image_view_handle))
+        {
+            return false;
+        }
+
+        VkRenderingAttachmentInfo const color_attachment_info{
+            .sType{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
+            .pNext{nullptr},
+            .imageView{swapchain_image_view_handle},
+            .imageLayout{VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL},
+            .resolveMode{VK_RESOLVE_MODE_NONE},
+            .resolveImageView{VK_NULL_HANDLE},
+            .resolveImageLayout{VK_IMAGE_LAYOUT_UNDEFINED},
+            .loadOp{VK_ATTACHMENT_LOAD_OP_CLEAR},
+            .storeOp{VK_ATTACHMENT_STORE_OP_STORE},
+            .clearValue{.color{.64f, .64f, .64f, 1.f}}
+        };
+
+        VkRenderingAttachmentInfo const depth_attachment_info{
+            .sType{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
+            .pNext{nullptr},
+            .imageView{depth_attachment_image_view_handle},
+            .imageLayout{VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL},
+            .resolveMode{VK_RESOLVE_MODE_NONE},
+            .resolveImageView{VK_NULL_HANDLE},
+            .resolveImageLayout{VK_IMAGE_LAYOUT_UNDEFINED},
+            .loadOp{VK_ATTACHMENT_LOAD_OP_CLEAR},
+            .storeOp{VK_ATTACHMENT_STORE_OP_DONT_CARE},
+            .clearValue {.depthStencil{0.f, 0}}
+        };
+
+        VkRenderingInfo const renderingInfo{
+            .sType{VK_STRUCTURE_TYPE_RENDERING_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .renderArea{
+                .offset{0, 0},
+                .extent{.width{width}, .height{height}}
+            },
+            .layerCount{1},
+            .viewMask{0},
+            .colorAttachmentCount{1},
+            .pColorAttachments{&color_attachment_info},
+            .pDepthAttachment{&depth_attachment_info},
+            .pStencilAttachment{nullptr}
+        };
+        vkCmdBeginRendering(command_buffer, &renderingInfo);
+
+        VkViewport const viewport{
+            .x{0},
+            .y{static_cast<float>(height)},
+            .width{static_cast<float>(width)},
+            .height{-static_cast<float>(height)},
+            .minDepth{0},
+            .maxDepth{1},
+        };
+        vkCmdSetViewport(command_buffer, 0, 1, &viewport);
+
+        VkRect2D const scissor{
+            .offset{0, 0}, .extent{width, height}
+        };
+        vkCmdSetScissor(command_buffer, 0, 1, &scissor);
+
+        vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
         // Update shader data
         // Record command buffer
+
+        vkCmdEndRendering(command_buffer);
 
         {
             // Swapchain image transition for following presentation
@@ -685,7 +937,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
             std::array const command_buffer_submit_info{
                 VkCommandBufferSubmitInfo{
-                   .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
+                    .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
                    .pNext{nullptr},
                    .commandBuffer{command_buffer},
                    .deviceMask{0}
@@ -725,7 +977,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
             VKGC_VERIFYF_VKSUCCESS(
                 vkQueueSubmit2(vulkan_device.main_queue(), 1, &submit_info, VK_NULL_HANDLE),
-                "failed to submit [#{}] frame render command buffer", frame_slot_index);
+                "failed to submit [#{}] frame render command buffer",
+                frame_slot_index);
         }
 
         frame_ring.end_frame();
