@@ -8,7 +8,7 @@ IndentWidth: 4
 TabWidth: 4
 UseTab: Never
 IndentCaseLabels: false
-NamespaceIndentation: None
+NamespaceIndentation: All
 IndentPPDirectives: AfterHash
 PPIndentWidth: 2
 
@@ -25,9 +25,17 @@ PointerAlignment: Left
 ReferenceAlignment: Left
 DerivePointerAlignment: false
 QualifierAlignment: Right
-AlignAfterOpenBracket: Align
+# When a paren/brace list breaks, break after the opening bracket and place the
+# closing bracket on its own line (closing `}` of a multi-line braced initializer
+# lands on its own line; single-line lists stay compact).
+AlignAfterOpenBracket: BlockIndent
 AlignOperands: Align
 LambdaBodyIndentation: OuterScope
+
+# Bin packing: each parameter / argument / designated initializer on its own line
+# once the list is broken across lines.
+BinPackParameters: false
+BinPackArguments: false
 
 # Short forms
 AllowShortFunctionsOnASingleLine: Inline
@@ -35,6 +43,14 @@ AllowShortLambdasOnASingleLine: Inline
 AllowShortBlocksOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
+
+# Templates
+BreakTemplateDeclarations: Yes
+
+# Comments — keep one space before trailing `//`, never column-align across lines.
+AlignTrailingComments:
+  Kind: Never
+  OverEmptyLines: 0
 
 # Includes
 SortIncludes: Never
