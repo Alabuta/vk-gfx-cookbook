@@ -139,12 +139,6 @@ export namespace vkgc
         using type = shader_payload;
     };
 
-    template <>
-    struct vk_object_payload<vk_object_tags::shader_module>
-    {
-        using type = shader_module_payload;
-    };
-
     template <typename Tag>
     using vk_object_payload_t = vk_object_payload<Tag>::type;
 }
