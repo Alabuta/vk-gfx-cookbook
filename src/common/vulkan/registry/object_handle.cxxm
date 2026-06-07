@@ -16,6 +16,9 @@ export namespace vkgc::vk_object_tags
     struct command_pool{};
     struct command_buffer{};
     struct shader{};
+    struct pipeline_layout{};
+    struct pipeline{};
+    struct pipeline_cache{};
 }
 
 export namespace vkgc
@@ -45,4 +48,7 @@ export namespace vkgc
     using vk_command_pool_handle = vk_object_handle<vk_object_tags::command_pool>;
     using vk_command_buffer_handle = vk_object_handle<vk_object_tags::command_buffer>;
     using vk_shader_handle = vk_object_handle<vk_object_tags::shader>;
+    using vk_pipeline_layout_handle = vk_object_handle<vk_object_tags::pipeline_layout>;
+    using vk_pipeline_handle = vk_object_handle<vk_object_tags::pipeline>;
+    using vk_pipeline_cache_handle = vk_object_handle<vk_object_tags::pipeline_cache>;
 }

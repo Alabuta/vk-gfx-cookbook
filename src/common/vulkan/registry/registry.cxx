@@ -40,10 +40,14 @@ namespace vkgc
                 result);
         }
 
-        // Destruction order: command_buffers -> command_pools -> image_views ->
-        // images -> buffers -> allocations -> semaphores -> fences.
+        // Destruction order: command_buffers -> command_pools -> pipelines ->
+        // pipeline_layouts -> pipeline_caches -> image_views -> images -> buffers ->
+        // allocations -> semaphores -> fences.
         drain_pool_in_destructor<vk_object_tags::command_buffer>();
         drain_pool_in_destructor<vk_object_tags::command_pool>();
+        drain_pool_in_destructor<vk_object_tags::pipeline>();
+        drain_pool_in_destructor<vk_object_tags::pipeline_layout>();
+        drain_pool_in_destructor<vk_object_tags::pipeline_cache>();
         drain_pool_in_destructor<vk_object_tags::image_view>();
         drain_pool_in_destructor<vk_object_tags::image>();
         drain_pool_in_destructor<vk_object_tags::buffer>();
@@ -365,6 +369,100 @@ namespace vkgc
         return shaders;
     }
 
+    vk_pipeline_layout_handle vulkan_object_registry::create_pipeline_layout(
+        VkPipelineLayoutCreateInfo const& info,
+        char const* debug_name)
+    {
+        VkPipelineLayout handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreatePipelineLayout(device_.handle(), &info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create pipeline layout ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_LAYOUT, std::bit_cast<std::uint64_t>(handle), debug_name);
+
+        return slot_map<vk_object_tags::pipeline_layout>().emplace(handle);
+    }
+
+    vk_pipeline_cache_handle vulkan_object_registry::create_pipeline_cache_from_data(
+        std::span<std::byte const> const cache_data,
+        char const* debug_name)
+    {
+        if (!VKGC_ENSUREF(!cache_data.empty(), "pipeline cache is empty"))
+        {
+            return {};
+        }
+
+        VkPipelineCacheCreateInfo const info{
+            .sType{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .initialDataSize{static_cast<std::uint32_t>(cache_data.size())},
+            .pInitialData{reinterpret_cast<std::uint32_t const*>(cache_data.data())},
+        };
+
+        VkPipelineCache handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreatePipelineCache(device_.handle(), &info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create pipeline cache ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_CACHE, std::bit_cast<std::uint64_t>(handle), debug_name);
+
+        return slot_map<vk_object_tags::pipeline_cache>().emplace(handle);
+    }
+
+    vk_pipeline_cache_handle vulkan_object_registry::create_pipeline_cache_empty(char const* debug_name)
+    {
+        VkPipelineCacheCreateInfo const info{
+            .sType{VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .initialDataSize{0},
+            .pInitialData{nullptr},
+        };
+
+        VkPipelineCache handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreatePipelineCache(device_.handle(), &info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create pipeline cache ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_CACHE, std::bit_cast<std::uint64_t>(handle), debug_name);
+
+        return slot_map<vk_object_tags::pipeline_cache>().emplace(handle);
+    }
+
+    vk_pipeline_handle vulkan_object_registry::create_graphics_pipeline(
+        VkGraphicsPipelineCreateInfo const& info,
+        vk_pipeline_cache_handle const cache,
+        char const* debug_name)
+    {
+        VkPipeline handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreateGraphicsPipelines(
+                device_.handle(),
+                resolve_handle(cache),
+                1,
+                &info,
+                nullptr,
+                &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create graphics pipeline ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE, std::bit_cast<std::uint64_t>(handle), debug_name);
+
+        return slot_map<vk_object_tags::pipeline>().emplace(handle);
+    }
+
     VkFormat vulkan_object_registry::image_format(vk_image_handle handle) const noexcept
     {
         image_payload const* p = slot_map<vk_object_tags::image>().try_get(handle);
@@ -381,6 +479,35 @@ namespace vkgc
     {
         buffer_payload const* p = slot_map<vk_object_tags::buffer>().try_get(handle);
         return p != nullptr ? p->size : VkDeviceSize{0};
+    }
+
+    std::vector<std::byte> vulkan_object_registry::pipeline_cache_data(vk_pipeline_cache_handle const handle) const
+    {
+        auto const pipeline_cache = resolve_handle(handle);
+        if (!VKGC_ENSUREF_VKHANDLE(pipeline_cache, "invalid pipeline cache"))
+        {
+            return {};
+        }
+
+        std::size_t size{0};
+        if (auto const result = vkGetPipelineCacheData(device_.handle(), pipeline_cache, &size, nullptr);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to query pipeline cache data size ({})", result);
+            return {};
+        }
+
+        std::vector<std::byte> data(size);
+        if (auto const result = vkGetPipelineCacheData(device_.handle(), pipeline_cache, &size, data.data());
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to retrieve pipeline cache data ({})", result);
+            return {};
+        }
+
+        // The second query may report fewer bytes than the first; trim to the actual size.
+        data.resize(size);
+        return data;
     }
 
 }

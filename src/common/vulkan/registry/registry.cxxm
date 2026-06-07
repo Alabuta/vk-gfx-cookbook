@@ -1,5 +1,6 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <tuple>
 #include <vector>
@@ -78,6 +79,25 @@ export namespace vkgc
             std::span<shader_create_info const> infos,
             std::span<std::byte const> shader_code);
 
+        [[nodiscard]]
+        vk_pipeline_layout_handle create_pipeline_layout(
+            VkPipelineLayoutCreateInfo const& info,
+            char const* debug_name = "");
+
+        [[nodiscard]]
+        vk_pipeline_cache_handle create_pipeline_cache_from_data(
+            std::span<std::byte const> cache_data,
+            char const* debug_name = "");
+
+        [[nodiscard]]
+        vk_pipeline_cache_handle create_pipeline_cache_empty(char const* debug_name = "");
+
+        [[nodiscard]]
+        vk_pipeline_handle create_graphics_pipeline(
+            VkGraphicsPipelineCreateInfo const& info,
+            vk_pipeline_cache_handle cache = {},
+            char const* debug_name = "");
+
         // Resolve the underlying Vulkan object from a handle. Returns VK_NULL_HANDLE-of-T for stale handles.
         template <typename Tag>
         [[nodiscard]]
@@ -121,6 +141,11 @@ export namespace vkgc
         [[nodiscard]]
         VkDeviceSize buffer_size(vk_buffer_handle handle) const noexcept;
 
+        // Serializes the pipeline cache's contents for persistence across runs.
+        // Returns an empty vector for a stale handle or on query failure.
+        [[nodiscard]]
+        std::vector<std::byte> pipeline_cache_data(vk_pipeline_cache_handle handle) const;
+
         [[nodiscard]]
         vulkan_device const& device() const noexcept { return device_; }
 
@@ -136,7 +161,10 @@ export namespace vkgc
             vulkan_slot_map<vk_object_tags::timeline_semaphore, semaphore_payload>,
             vulkan_slot_map<vk_object_tags::command_pool, command_pool_payload>,
             vulkan_slot_map<vk_object_tags::command_buffer, command_buffer_payload>,
-            vulkan_slot_map<vk_object_tags::shader, shader_payload>
+            vulkan_slot_map<vk_object_tags::shader, shader_payload>,
+            vulkan_slot_map<vk_object_tags::pipeline_layout, pipeline_layout_payload>,
+            vulkan_slot_map<vk_object_tags::pipeline, pipeline_payload>,
+            vulkan_slot_map<vk_object_tags::pipeline_cache, pipeline_cache_payload>
         >;
 
         vulkan_device const& device_;
@@ -173,5 +201,8 @@ export namespace vkgc
         void destroy_payload(command_pool_payload const& payload) noexcept;
         void destroy_payload(command_buffer_payload const& payload) noexcept;
         void destroy_payload(shader_payload const& payload) noexcept;
+        void destroy_payload(pipeline_layout_payload const& payload) noexcept;
+        void destroy_payload(pipeline_payload const& payload) noexcept;
+        void destroy_payload(pipeline_cache_payload const& payload) noexcept;
     };
 }

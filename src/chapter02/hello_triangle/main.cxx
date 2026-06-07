@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -9,6 +10,7 @@
 
 #include <fstream>
 #include <filesystem>
+#include <system_error>
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -214,6 +216,28 @@ static std::vector<T> load_binary_file(std::filesystem::path const& path)
     }
 
     return bytes;
+}
+
+static bool save_binary_file(std::filesystem::path const& path, std::span<std::byte const> const bytes)
+{
+    std::error_code ec;
+    std::filesystem::create_directories(path.parent_path(), ec);
+
+    if (ec)
+    {
+        std::println(stderr, "[FileIO] : Error : failed to save file [{}] : {}", ec.value(), ec.message());
+        return false;
+    }
+
+    std::ofstream file{path, std::ios::out | std::ios::binary | std::ios::trunc};
+    if (file.fail())
+    {
+        return false;
+    }
+
+    file.write(reinterpret_cast<char const*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+
+    return !file.fail();
 }
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
@@ -468,7 +492,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
     };
 
-    std::vector shader_stages{
+    std::array shader_stages{
         *shader_vertex_stage.as_pointer(),
         *shader_fragment_stage.as_pointer()
     };
@@ -517,9 +541,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .pVertexAttributeDescriptions{attribute_descriptions.data()}
     };
 
-    VkPipelineLayout pipeline_layout;
-    {
-        VkPipelineLayoutCreateInfo pipeline_layout_create_info{
+    auto const pipeline_layout = vk_object_registry.create_pipeline_layout(
+        {
             .sType{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO},
             .pNext{nullptr},
             .flags{0},
@@ -527,13 +550,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .pSetLayouts{nullptr},
             .pushConstantRangeCount{0},
             .pPushConstantRanges{nullptr}
-        };
-
-        VKGC_VERIFY_VKSUCCESS(
-            vkCreatePipelineLayout(vulkan_device.handle(), &pipeline_layout_create_info, nullptr, &pipeline_layout));
+        },
+        "triangle pipeline layout");
+    if (!VKGC_ENSURE(pipeline_layout.is_valid()))
+    {
+        return false;
     }
 
-    VkPipelineViewportStateCreateInfo const viewport_state{
+    VkPipelineViewportStateCreateInfo constexpr viewport_state{
         .sType{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO},
         .pNext{nullptr},
         .flags{0},
@@ -556,7 +580,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
        .pDynamicStates{dynamic_states.data()}
     };
 
-    VkPipelineDepthStencilStateCreateInfo const depth_stencil_state{
+    VkPipelineDepthStencilStateCreateInfo constexpr depth_stencil_state{
         .sType{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO},
         .pNext{nullptr},
         .flags{0},
@@ -583,56 +607,101 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .stencilAttachmentFormat{VK_FORMAT_UNDEFINED}
     };
 
-#if defined(__GNUC__) || defined(__GNUG__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#endif
-    VkPipelineColorBlendAttachmentState blendAttachment{
-        .colorWriteMask = 0xF
+    VkPipelineColorBlendAttachmentState color_blend_attachment_state{
+        .blendEnable{VK_FALSE},
+        .srcColorBlendFactor{},
+        .dstColorBlendFactor{},
+        .colorBlendOp{},
+        .srcAlphaBlendFactor{},
+        .dstAlphaBlendFactor{},
+        .alphaBlendOp{},
+        .colorWriteMask{
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+        }
     };
-    VkPipelineColorBlendStateCreateInfo color_blend_state{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments = &blendAttachment
+
+    VkPipelineColorBlendStateCreateInfo const color_blend_state{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .logicOpEnable{VK_FALSE},
+        .logicOp{},
+        .attachmentCount{1},
+        .pAttachments{&color_blend_attachment_state},
+        .blendConstants{}
     };
-    VkPipelineRasterizationStateCreateInfo rasterization_state{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-        .lineWidth = 1.0f
-   };
+
+    VkPipelineRasterizationStateCreateInfo constexpr rasterization_state{
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .depthClampEnable{VK_TRUE},
+        .rasterizerDiscardEnable{VK_FALSE},
+        .polygonMode{VK_POLYGON_MODE_FILL },
+        .cullMode{VK_CULL_MODE_BACK_BIT},
+        .frontFace{VK_FRONT_FACE_COUNTER_CLOCKWISE},
+        .depthBiasEnable{VK_FALSE},
+        .depthBiasConstantFactor{0.f},
+        .depthBiasClamp{0.f},
+        .depthBiasSlopeFactor{0.f},
+        .lineWidth{1.f}
+    };
+
     VkPipelineMultisampleStateCreateInfo multisample_state{
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .rasterizationSamples{VK_SAMPLE_COUNT_1_BIT},
+        .sampleShadingEnable{VK_FALSE},
+        .minSampleShading{1},
+        .pSampleMask{nullptr},
+        .alphaToCoverageEnable{VK_FALSE},
+        .alphaToOneEnable{VK_FALSE}
     };
-#if defined(__GNUC__) || defined(__GNUG__)
-#pragma GCC diagnostic pop
-#endif
 
-    VkPipeline pipeline;
+    std::filesystem::path const pipeline_cache_path{std::filesystem::path{kCacheDir} / "chapter02_triangle.pipeline"};
+
+    vkgc::vk_pipeline_cache_handle pipeline_cache;
+    if (auto const cache_data = load_binary_file<std::byte>(pipeline_cache_path); !cache_data.empty())
     {
-        VkGraphicsPipelineCreateInfo const create_info{
-            .sType{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO},
-            .pNext{&pipeline_rendering_create_info},
-            .flags{0}, // VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT
-            .stageCount{static_cast<std::uint32_t>(shader_stages.size())},
-            .pStages{shader_stages.data()},
-            .pVertexInputState{&vertex_input_state},
-            .pInputAssemblyState{&input_assembly_state},
-            .pTessellationState{nullptr},
-            .pViewportState{&viewport_state},
-            .pRasterizationState{&rasterization_state},
-            .pMultisampleState{&multisample_state},
-            .pDepthStencilState{&depth_stencil_state},
-            .pColorBlendState{&color_blend_state},
-            .pDynamicState{&pipeline_dynamic_state},
-            .layout{pipeline_layout},
-            .renderPass{VK_NULL_HANDLE},
-            .subpass{0},
-            .basePipelineHandle{VK_NULL_HANDLE},
-            .basePipelineIndex{-1}
-        };
+        pipeline_cache = vk_object_registry.create_pipeline_cache_from_data(cache_data, "triangle pipeline cache");
+    }
+    else
+    {
+        pipeline_cache = vk_object_registry.create_pipeline_cache_empty("triangle pipeline cache");
+    }
 
-        VKGC_VERIFY_VKSUCCESS(
-            vkCreateGraphicsPipelines(vulkan_device.handle(), VK_NULL_HANDLE, 1, &create_info, nullptr, &pipeline));
+    VKGC_ENSURE(pipeline_cache.is_valid());
+
+    VkGraphicsPipelineCreateInfo const pipeline_create_info{
+        .sType{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO},
+        .pNext{&pipeline_rendering_create_info},
+        .flags{0}, // VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT
+        .stageCount{static_cast<std::uint32_t>(shader_stages.size())},
+        .pStages{shader_stages.data()},
+        .pVertexInputState{&vertex_input_state},
+        .pInputAssemblyState{&input_assembly_state},
+        .pTessellationState{nullptr},
+        .pViewportState{&viewport_state},
+        .pRasterizationState{&rasterization_state},
+        .pMultisampleState{&multisample_state},
+        .pDepthStencilState{&depth_stencil_state},
+        .pColorBlendState{&color_blend_state},
+        .pDynamicState{&pipeline_dynamic_state},
+        .layout{vk_object_registry.resolve_handle(pipeline_layout)},
+        .renderPass{VK_NULL_HANDLE},
+        .subpass{0},
+        .basePipelineHandle{VK_NULL_HANDLE},
+        .basePipelineIndex{-1}
+    };
+
+    auto const pipeline = vk_object_registry.create_graphics_pipeline(
+        pipeline_create_info,
+        pipeline_cache,
+        "triangle pipeline");
+    if (!VKGC_ENSURE(pipeline.is_valid()))
+    {
+        return false;
     }
 
     vkgc::update_loop([&]
@@ -871,7 +940,13 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         };
         vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-        vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+        auto const pipeline_handle = vk_object_registry.resolve_handle(pipeline);
+        if (!VKGC_ENSURE_VKHANDLE(pipeline_handle))
+        {
+            return false;
+        }
+
+        vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_handle);
 
         // Update shader data
         // Record command buffer
@@ -1009,6 +1084,20 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         glfwPollEvents();
         return true;
     });
+
+    if (pipeline_cache.is_valid())
+    {
+        if (auto const cache_data = vk_object_registry.pipeline_cache_data(pipeline_cache); !cache_data.empty())
+        {
+            if (!save_binary_file(pipeline_cache_path, cache_data))
+            {
+                std::println(
+                    stderr,
+                    "[Vulkan] : Warning : failed to persist pipeline cache [{}]",
+                    pipeline_cache_path.string());
+            }
+        }
+    }
 
     return true;
 }

@@ -56,4 +56,19 @@ namespace vkgc
     {
         vkDestroyShaderEXT(device_.handle(), payload.handle, nullptr);
     }
+
+    void vulkan_object_registry::destroy_payload(pipeline_layout_payload const& payload) noexcept
+    {
+        vkDestroyPipelineLayout(device_.handle(), payload.handle, nullptr);
+    }
+
+    void vulkan_object_registry::destroy_payload(pipeline_payload const& payload) noexcept
+    {
+        vkDestroyPipeline(device_.handle(), payload.handle, nullptr);
+    }
+
+    void vulkan_object_registry::destroy_payload(pipeline_cache_payload const& payload) noexcept
+    {
+        vkDestroyPipelineCache(device_.handle(), payload.handle, nullptr);
+    }
 }
