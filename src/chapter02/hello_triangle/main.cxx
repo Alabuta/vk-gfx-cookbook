@@ -298,8 +298,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             presenter.request_rebuild();
         });
 
-    auto const [surface_width, surface_height] = presenter.surface_extent();
-
     auto swapchain_image_view_handles = create_swapchain_image_views(
         vk_object_registry,
         presenter.images(),
@@ -363,7 +361,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     if (!create_depth_attachment(
         vk_object_registry,
         depth_attachment_format,
-        {.width{surface_width}, .height{surface_height}, .depth{1}},
+        {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
         depth_attachment_image,
         depth_attachment_image_memory,
         depth_attachment_image_view))
@@ -408,7 +406,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         if (!create_depth_attachment(
             vk_object_registry,
             depth_attachment_format,
-            {.width{surface_width}, .height{surface_height}, .depth{1}},
+            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
             depth_attachment_image,
             depth_attachment_image_memory,
             depth_attachment_image_view))
@@ -671,7 +669,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         pipeline_cache = vk_object_registry.create_pipeline_cache_empty("triangle pipeline cache");
     }
 
-    VKGC_ENSURE(pipeline_cache.is_valid());
+    VKGC_VERIFY(pipeline_cache.is_valid());
 
     VkGraphicsPipelineCreateInfo const pipeline_create_info{
         .sType{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO},
@@ -908,13 +906,15 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .clearValue {.depthStencil{0.f, 0}}
         };
 
+        auto const [render_width, render_height] = presenter.surface_extent();
+
         VkRenderingInfo const renderingInfo{
             .sType{VK_STRUCTURE_TYPE_RENDERING_INFO},
             .pNext{nullptr},
             .flags{0},
             .renderArea{
                 .offset{0, 0},
-                .extent{.width{width}, .height{height}}
+                .extent{.width{render_width}, .height{render_height}}
             },
             .layerCount{1},
             .viewMask{0},
@@ -927,16 +927,16 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         VkViewport const viewport{
             .x{0},
-            .y{static_cast<float>(height)},
-            .width{static_cast<float>(width)},
-            .height{-static_cast<float>(height)},
+            .y{static_cast<float>(render_height)},
+            .width{static_cast<float>(render_width)},
+            .height{-static_cast<float>(render_height)},
             .minDepth{0},
             .maxDepth{1},
         };
         vkCmdSetViewport(command_buffer, 0, 1, &viewport);
 
         VkRect2D const scissor{
-            .offset{0, 0}, .extent{width, height}
+            .offset{0, 0}, .extent{render_width, render_height}
         };
         vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
