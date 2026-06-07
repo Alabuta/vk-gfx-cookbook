@@ -15,6 +15,10 @@ namespace vkgc
     void vulkan_object_registry::destroy_payload(image_payload const& payload) noexcept
     {
         vkDestroyImage(device_.handle(), payload.handle, nullptr);
+        if (payload.allocation.is_valid())
+        {
+            destroy_immediate(payload.allocation);
+        }
     }
 
     void vulkan_object_registry::destroy_payload(image_view_payload const& payload) noexcept
@@ -25,6 +29,10 @@ namespace vkgc
     void vulkan_object_registry::destroy_payload(buffer_payload const& payload) noexcept
     {
         vkDestroyBuffer(device_.handle(), payload.handle, nullptr);
+        if (payload.allocation.is_valid())
+        {
+            destroy_immediate(payload.allocation);
+        }
     }
 
     void vulkan_object_registry::destroy_payload(allocation_payload const& payload) noexcept

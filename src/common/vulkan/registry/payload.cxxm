@@ -19,6 +19,8 @@ export namespace vkgc
         VkExtent3D extent{};
         std::uint32_t mip_levels{1};
         std::uint32_t array_layers{1};
+
+        vk_allocation_handle allocation{};
     };
 
     struct image_view_payload
@@ -32,6 +34,8 @@ export namespace vkgc
         VkBuffer handle{VK_NULL_HANDLE};
         VkDeviceSize size{0};
         VkBufferUsageFlags usage{0};
+
+        vk_allocation_handle allocation{};
     };
 
     struct allocation_payload

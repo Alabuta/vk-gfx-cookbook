@@ -43,10 +43,22 @@ export namespace vkgc
         vk_image_handle create_image(VkImageCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
+        vk_image_handle create_memory_bound_image(
+            VkImageCreateInfo const& image_info,
+            VmaAllocationCreateInfo const& allocation_info,
+            char const* debug_name = "");
+
+        [[nodiscard]]
         vk_allocation_handle allocate_image_memory(vk_image_handle image, VmaAllocationCreateInfo const& alloc_info);
 
         [[nodiscard]]
         vk_buffer_handle create_buffer(VkBufferCreateInfo const& info, char const* debug_name = "");
+
+        [[nodiscard]]
+        vk_buffer_handle create_memory_bound_buffer(
+            VkBufferCreateInfo const& buffer_info,
+            VmaAllocationCreateInfo const& allocation_info,
+            char const* debug_name = "");
 
         [[nodiscard]]
         vk_allocation_handle allocate_buffer_memory(vk_buffer_handle buffer, VmaAllocationCreateInfo const& alloc_info);
@@ -140,6 +152,9 @@ export namespace vkgc
 
         [[nodiscard]]
         VkDeviceSize buffer_size(vk_buffer_handle handle) const noexcept;
+
+        [[nodiscard]]
+        vk_allocation_handle bound_allocation(vk_buffer_handle handle) const noexcept;
 
         // Serializes the pipeline cache's contents for persistence across runs.
         // Returns an empty vector for a stale handle or on query failure.

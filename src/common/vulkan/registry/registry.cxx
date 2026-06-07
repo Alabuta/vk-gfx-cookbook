@@ -75,8 +75,42 @@ namespace vkgc
             info.format,
             info.extent,
             info.mipLevels,
-            info.arrayLayers
+            info.arrayLayers,
+            vk_allocation_handle{}
         );
+    }
+
+    vk_image_handle vulkan_object_registry::create_memory_bound_image(
+        VkImageCreateInfo const& image_info,
+        VmaAllocationCreateInfo const& allocation_info,
+        char const* debug_name)
+    {
+        VkImage image{VK_NULL_HANDLE};
+        VmaAllocation allocation{VK_NULL_HANDLE};
+
+        if (auto const result = vmaCreateImage(
+                device_.vma_allocator(),
+                &image_info,
+                &allocation_info,
+                &image,
+                &allocation,
+                nullptr);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create memory bound image ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE, std::bit_cast<std::uint64_t>(image), debug_name);
+
+        auto allocation_handle = slot_map<vk_object_tags::allocation>().emplace(allocation);
+        return slot_map<vk_object_tags::image>().emplace(
+            image,
+            image_info.format,
+            image_info.extent,
+            image_info.mipLevels,
+            image_info.arrayLayers,
+            allocation_handle);
     }
 
     vk_allocation_handle vulkan_object_registry::allocate_image_memory(
@@ -118,7 +152,38 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_BUFFER, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::buffer>().emplace(handle, info.size, info.usage);
+        return slot_map<vk_object_tags::buffer>().emplace(handle, info.size, info.usage, vk_allocation_handle{});
+    }
+
+    vk_buffer_handle vulkan_object_registry::create_memory_bound_buffer(
+        VkBufferCreateInfo const& buffer_info,
+        VmaAllocationCreateInfo const& allocation_info,
+        char const* debug_name)
+    {
+        VkBuffer buffer{VK_NULL_HANDLE};
+        VmaAllocation allocation{VK_NULL_HANDLE};
+
+        if (auto const result = vmaCreateBuffer(
+                device_.vma_allocator(),
+                &buffer_info,
+                &allocation_info,
+                &buffer,
+                &allocation,
+                nullptr);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create memory bound buffer ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_BUFFER, std::bit_cast<std::uint64_t>(buffer), debug_name);
+
+        auto allocation_handle = slot_map<vk_object_tags::allocation>().emplace(allocation);
+        return slot_map<vk_object_tags::buffer>().emplace(
+            buffer,
+            buffer_info.size,
+            buffer_info.usage,
+            allocation_handle);
     }
 
     vk_allocation_handle vulkan_object_registry::allocate_buffer_memory(
@@ -479,6 +544,12 @@ namespace vkgc
     {
         buffer_payload const* p = slot_map<vk_object_tags::buffer>().try_get(handle);
         return p != nullptr ? p->size : VkDeviceSize{0};
+    }
+
+    vk_allocation_handle vulkan_object_registry::bound_allocation(vk_buffer_handle handle) const noexcept
+    {
+        buffer_payload const* p = slot_map<vk_object_tags::buffer>().try_get(handle);
+        return p != nullptr ? p->allocation : vk_allocation_handle{};
     }
 
     std::vector<std::byte> vulkan_object_registry::pipeline_cache_data(vk_pipeline_cache_handle const handle) const
