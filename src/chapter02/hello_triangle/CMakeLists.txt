@@ -16,6 +16,7 @@ target_link_libraries(chapter02_hello_triangle
 
         vkgc::dependencies::vulkan
         vkgc::dependencies::windowing
+        vkgc::dependencies::math
         vkgc::dependencies::concurrency
         vkgc::dependencies::shaders
         vkgc::dependencies::stdcxx_extras

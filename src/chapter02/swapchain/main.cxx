@@ -88,7 +88,6 @@ static bool create_depth_attachment(
     VkFormat const image_format,
     VkExtent3D const image_extent,
     vkgc::vk_image_handle& image,
-    vkgc::vk_allocation_handle& memory,
     vkgc::vk_image_view_handle& image_view)
 {
     VkImageCreateInfo const image_create_info{
@@ -109,15 +108,9 @@ static bool create_depth_attachment(
         .initialLayout{VK_IMAGE_LAYOUT_UNDEFINED}
     };
 
-    image = vk_object_registry.create_image(image_create_info, "depth attachment image");
-    if (!image.is_valid())
-    {
-        return false;
-    }
-
     VmaAllocationCreateInfo constexpr allocation_create_info{
         .flags{VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT},
-        .usage{VMA_MEMORY_USAGE_UNKNOWN},
+        .usage{VMA_MEMORY_USAGE_AUTO},
         .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
         .preferredFlags{0},
         .memoryTypeBits{0},
@@ -126,17 +119,12 @@ static bool create_depth_attachment(
         .priority{0}
     };
 
-    memory = vk_object_registry.allocate_image_memory(image, allocation_create_info);
-    if (!memory.is_valid())
+    image = vk_object_registry.create_memory_bound_image(
+        image_create_info,
+        allocation_create_info,
+        "depth attachment image");
+    if (!image.is_valid())
     {
-        vk_object_registry.destroy_immediate(image);
-        return false;
-    }
-
-    if (!bind_image_memory(vk_object_registry, image, memory))
-    {
-        vk_object_registry.destroy_immediate(image);
-        vk_object_registry.destroy_immediate(memory);
         return false;
     }
 
@@ -165,9 +153,7 @@ static bool create_depth_attachment(
     image_view = vk_object_registry.create_image_view(depth_view_create_info, "depth attachment image view");
     if (!image_view.is_valid())
     {
-        vk_object_registry.destroy_immediate(image_view);
         vk_object_registry.destroy_immediate(image);
-        vk_object_registry.destroy_immediate(memory);
         return false;
     }
 
@@ -292,7 +278,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     }
 
     vkgc::vk_image_handle depth_attachment_image;
-    vkgc::vk_allocation_handle depth_attachment_image_memory;
     vkgc::vk_image_view_handle depth_attachment_image_view;
 
     if (!create_depth_attachment(
@@ -300,7 +285,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         depth_attachment_format,
         {.width{surface_width}, .height{surface_height}, .depth{1}},
         depth_attachment_image,
-        depth_attachment_image_memory,
         depth_attachment_image_view))
     {
         std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
@@ -318,7 +302,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         vk_object_registry.destroy_immediate(depth_attachment_image_view);
         vk_object_registry.destroy_immediate(depth_attachment_image);
-        vk_object_registry.destroy_immediate(depth_attachment_image_memory);
 
         for (auto const image_view_handle : swapchain_image_view_handles)
         {
@@ -345,7 +328,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             depth_attachment_format,
             {.width{surface_width}, .height{surface_height}, .depth{1}},
             depth_attachment_image,
-            depth_attachment_image_memory,
             depth_attachment_image_view))
         {
             std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");

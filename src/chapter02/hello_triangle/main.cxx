@@ -13,6 +13,8 @@
 #include <volk.h>
 #include <vk_mem_alloc.h>
 
+#include <glm/glm.hpp>
+
 #include "GLFW/glfw3.h"
 
 #include "vulkan/format.hxx"
@@ -98,7 +100,6 @@ static bool create_depth_attachment(
     VkFormat const image_format,
     VkExtent3D const image_extent,
     vkgc::vk_image_handle& image,
-    vkgc::vk_allocation_handle& memory,
     vkgc::vk_image_view_handle& image_view)
 {
     VkImageCreateInfo const image_create_info{
@@ -119,12 +120,6 @@ static bool create_depth_attachment(
         .initialLayout{VK_IMAGE_LAYOUT_UNDEFINED}
     };
 
-    image = vk_object_registry.create_image(image_create_info, "depth attachment image");
-    if (!image.is_valid())
-    {
-        return false;
-    }
-
     VmaAllocationCreateInfo constexpr allocation_create_info{
         .flags{VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT},
         .usage{VMA_MEMORY_USAGE_UNKNOWN},
@@ -136,17 +131,12 @@ static bool create_depth_attachment(
         .priority{0}
     };
 
-    memory = vk_object_registry.allocate_image_memory(image, allocation_create_info);
-    if (!memory.is_valid())
+    image = vk_object_registry.create_memory_bound_image(
+        image_create_info,
+        allocation_create_info,
+        "depth attachment image");
+    if (!image.is_valid())
     {
-        vk_object_registry.destroy_immediate(image);
-        return false;
-    }
-
-    if (!bind_image_memory(vk_object_registry, image, memory))
-    {
-        vk_object_registry.destroy_immediate(image);
-        vk_object_registry.destroy_immediate(memory);
         return false;
     }
 
@@ -175,13 +165,47 @@ static bool create_depth_attachment(
     image_view = vk_object_registry.create_image_view(depth_view_create_info, "depth attachment image view");
     if (!image_view.is_valid())
     {
-        vk_object_registry.destroy_immediate(image_view);
         vk_object_registry.destroy_immediate(image);
-        vk_object_registry.destroy_immediate(memory);
         return false;
     }
 
     return true;
+}
+
+[[nodiscard]]
+static vkgc::vk_buffer_handle create_vertex_buffer(vkgc::vulkan_object_registry& resources, std::size_t const size)
+{
+    if (!VKGC_ENSURE(size > 0))
+    {
+        return {};
+    }
+
+    VkBufferCreateInfo const buffer_create_info{
+        .sType{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .size{static_cast<VkDeviceSize>(size)},
+        .usage{VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
+        .sharingMode{VK_SHARING_MODE_EXCLUSIVE },
+        .queueFamilyIndexCount{0},
+        .pQueueFamilyIndices{nullptr},
+    };
+
+    VmaAllocationCreateInfo constexpr buffer_allocation_info{
+        .flags{
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT
+        },
+        .usage{VMA_MEMORY_USAGE_AUTO},
+        .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+        .preferredFlags{0},
+        .memoryTypeBits{0},
+        .pool{VK_NULL_HANDLE},
+        .pUserData{nullptr},
+        .priority{0}
+    };
+
+    return resources.create_memory_bound_buffer(buffer_create_info, buffer_allocation_info);
 }
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
@@ -299,16 +323,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     }
 
     vkgc::vk_image_handle depth_attachment_image;
-    vkgc::vk_allocation_handle depth_attachment_image_memory;
     vkgc::vk_image_view_handle depth_attachment_image_view;
 
     if (!create_depth_attachment(
-        vk_object_registry,
-        depth_attachment_format,
-        {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
-        depth_attachment_image,
-        depth_attachment_image_memory,
-        depth_attachment_image_view))
+            vk_object_registry,
+            depth_attachment_format,
+            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
+            depth_attachment_image,
+            depth_attachment_image_view))
     {
         std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
         return false;
@@ -325,7 +347,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         vk_object_registry.destroy_immediate(depth_attachment_image_view);
         vk_object_registry.destroy_immediate(depth_attachment_image);
-        vk_object_registry.destroy_immediate(depth_attachment_image_memory);
 
         for (auto const image_view_handle : swapchain_image_view_handles | std::views::values)
         {
@@ -348,12 +369,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
 
         if (!create_depth_attachment(
-            vk_object_registry,
-            depth_attachment_format,
-            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
-            depth_attachment_image,
-            depth_attachment_image_memory,
-            depth_attachment_image_view))
+                vk_object_registry,
+                depth_attachment_format,
+                {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
+                depth_attachment_image,
+                depth_attachment_image_view))
         {
             std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
             return false;
@@ -448,11 +468,53 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     };
 
     struct vertex {
-        /*glm::vec3 pos;
+        glm::vec2 position;
+        /*glm::vec3 position;
         glm::vec3 normal;
         glm::vec2 uv;*/
-        float p[3];
     };
+
+    std::array constexpr vertices{
+        glm::vec2{-.5f, -.5f},
+        glm::vec2{.5f, -.5f},
+        glm::vec2{.0f, .5f}
+    };
+
+    std::uint32_t constexpr vertex_count{static_cast<std::uint32_t>(vertices.size())};
+    std::size_t constexpr size_in_bytes{sizeof(vertex) * vertex_count};
+
+    auto const vertex_buffer = create_vertex_buffer(vk_object_registry, size_in_bytes);
+    if (!vertex_buffer.is_valid())
+    {
+        return false;
+    }
+
+    if (auto const vertex_buffer_memory = vk_object_registry.bound_allocation(vertex_buffer);
+        VKGC_ENSURE(vertex_buffer_memory.is_valid()))
+    {
+        VmaAllocationInfo2 allocation_info;
+        vmaGetAllocationInfo2(
+            vulkan_device.vma_allocator(),
+            vk_object_registry.resolve_handle(vertex_buffer_memory),
+            &allocation_info
+        );
+
+        void* mapped_ptr;
+        if (!VKGC_ENSURE_VKSUCCESS(
+            vkMapMemory(
+                vulkan_device.handle(),
+                allocation_info.allocationInfo.deviceMemory,
+                allocation_info.allocationInfo.offset,
+                size_in_bytes,
+                0,
+                &mapped_ptr
+            )))
+        {
+            return false;
+        }
+
+        memcpy(mapped_ptr, vertices.data(), size_in_bytes);
+    }
 
     std::array const binding_descriptions{
         VkVertexInputBindingDescription{
@@ -466,7 +528,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         VkVertexInputAttributeDescription{
             .location{0},
             .binding{0},
-            .format{VK_FORMAT_R32G32B32_SFLOAT},
+            .format{VK_FORMAT_R32G32_SFLOAT},
             .offset{0}
         }
         // { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, normal) },
@@ -894,6 +956,26 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         // Update shader data
         // Record command buffer
+
+        VkDeviceSize buffer_offset{0};
+        /*vkCmdBindDescriptorSets(
+            command_buffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipelineLayout,
+            0,
+            1,
+            &descriptorSetTex,
+            0,
+            nullptr);*/
+
+        auto const vertex_buffer_handle = vk_object_registry.resolve_handle(vertex_buffer);
+        if (!VKGC_ENSURE_VKHANDLE(vertex_buffer_handle))
+        {
+            return false;
+        }
+
+        vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer_handle, &buffer_offset);
+        vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
 
         vkCmdEndRendering(command_buffer);
 
