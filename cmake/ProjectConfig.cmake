@@ -42,6 +42,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
             # app
             ${COMMON_DIR}/app/bootstrap.cxx
 
+            # io
+            ${COMMON_DIR}/io/file_io.cxx
+
             # platform
             ${COMMON_DIR}/platform/window.cxx
 
@@ -70,6 +73,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
                 FILES
                     # app
                     ${COMMON_DIR}/app/bootstrap.cxxm
+
+                    # io
+                    ${COMMON_DIR}/io/file_io.cxxm
 
                     # platform
                     ${COMMON_DIR}/platform/window.cxxm

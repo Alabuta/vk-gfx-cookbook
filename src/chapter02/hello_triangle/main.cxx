@@ -8,9 +8,7 @@
 #include <vector>
 #include <array>
 
-#include <fstream>
 #include <filesystem>
-#include <system_error>
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -26,6 +24,7 @@
 constexpr std::string_view kCacheDir = COOKBOOK_CACHE_DIR_STRING;
 
 import vkgc.bootstrap;
+import vkgc.file_io;
 import vkgc.window;
 import vkgc.vulkan_instance;
 import vkgc.vulkan_surface;
@@ -183,61 +182,6 @@ static bool create_depth_attachment(
     }
 
     return true;
-}
-
-template <typename T>
-static std::vector<T> load_binary_file(std::filesystem::path const& path)
-{
-    namespace fs = std::filesystem;
-
-    std::ifstream file{path, std::ios::in | std::ios::binary | std::ios::ate};
-
-    if (file.fail())
-    {
-        return {};
-    }
-
-    auto const chars_count = file.tellg();
-    if (chars_count < 1)
-    {
-        return {};
-    }
-
-    file.seekg(0, std::ios::beg);
-
-    VKGC_CHECK(static_cast<std::size_t>(chars_count) % sizeof(T) == 0);
-
-    std::vector<T> bytes(static_cast<std::size_t>(chars_count) / sizeof(T));
-    file.read(reinterpret_cast<std::istream::char_type*>(bytes.data()), chars_count);
-
-    if (file.fail())
-    {
-        return {};
-    }
-
-    return bytes;
-}
-
-static bool save_binary_file(std::filesystem::path const& path, std::span<std::byte const> const bytes)
-{
-    std::error_code ec;
-    std::filesystem::create_directories(path.parent_path(), ec);
-
-    if (ec)
-    {
-        std::println(stderr, "[FileIO] : Error : failed to save file [{}] : {}", ec.value(), ec.message());
-        return false;
-    }
-
-    std::ofstream file{path, std::ios::out | std::ios::binary | std::ios::trunc};
-    if (file.fail())
-    {
-        return false;
-    }
-
-    file.write(reinterpret_cast<char const*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-
-    return !file.fail();
 }
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
@@ -422,7 +366,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     // slangc chapter02_triangle.slang -profile spirv_1_5 -target spirv -o chapter02_triangle.spv
     std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter02_triangle.spv"};
-    auto spirv_words = load_binary_file<std::uint32_t>(path);
+    auto spirv_words = vkgc::load_binary_file<std::uint32_t>(path);
     if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
     {
         return false;
@@ -660,7 +604,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     std::filesystem::path const pipeline_cache_path{std::filesystem::path{kCacheDir} / "chapter02_triangle.pipeline"};
 
     vkgc::vk_pipeline_cache_handle pipeline_cache;
-    if (auto const cache_data = load_binary_file<std::byte>(pipeline_cache_path); !cache_data.empty())
+    if (auto const cache_data = vkgc::load_binary_file<std::byte>(pipeline_cache_path); !cache_data.empty())
     {
         pipeline_cache = vk_object_registry.create_pipeline_cache_from_data(cache_data, "triangle pipeline cache");
     }
@@ -1089,7 +1033,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     {
         if (auto const cache_data = vk_object_registry.pipeline_cache_data(pipeline_cache); !cache_data.empty())
         {
-            if (!save_binary_file(pipeline_cache_path, cache_data))
+            if (!vkgc::save_binary_file(pipeline_cache_path, cache_data))
             {
                 std::println(
                     stderr,

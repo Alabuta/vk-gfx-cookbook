@@ -1,0 +1,58 @@
+module;
+
+#include <cstddef>
+#include <filesystem>
+#include <fstream>
+#include <ios>
+#include <span>
+#include <vector>
+
+export module vkgc.file_io;
+
+export namespace vkgc
+{
+    namespace file_io_detail
+    {
+        // Defined in file_io.cxx so the VKGC_CHECK machinery (which pulls in
+        // <format>) stays out of this interface unit's global module fragment.
+        // GCC/MinGW multiply-defines <format>'s internal statics when they
+        // cross a module-interface boundary (MINGW-packages #25869), so every
+        // .cxxm here keeps <format>/<print> confined to its implementation TU.
+        void check_size_is_multiple(std::size_t byte_count, std::size_t element_size);
+    }
+
+    template <typename T>
+    std::vector<T> load_binary_file(std::filesystem::path const& path)
+    {
+        namespace fs = std::filesystem;
+
+        std::ifstream file{path, std::ios::in | std::ios::binary | std::ios::ate};
+
+        if (file.fail())
+        {
+            return {};
+        }
+
+        auto const chars_count = file.tellg();
+        if (chars_count < 1)
+        {
+            return {};
+        }
+
+        file.seekg(0, std::ios::beg);
+
+        file_io_detail::check_size_is_multiple(static_cast<std::size_t>(chars_count), sizeof(T));
+
+        std::vector<T> bytes(static_cast<std::size_t>(chars_count) / sizeof(T));
+        file.read(reinterpret_cast<std::istream::char_type*>(bytes.data()), chars_count);
+
+        if (file.fail())
+        {
+            return {};
+        }
+
+        return bytes;
+    }
+
+    bool save_binary_file(std::filesystem::path const& path, std::span<std::byte const> bytes);
+}
