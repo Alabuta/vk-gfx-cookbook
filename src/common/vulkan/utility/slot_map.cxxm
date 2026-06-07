@@ -3,7 +3,6 @@ module;
 #include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <new>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -70,14 +69,17 @@ export namespace vkgc
             {
                 slot_index = head_free_;
                 head_free_ = slots_[slot_index].next_free;
-                ::new (static_cast<void*>(&slots_[slot_index].payload)) Payload{std::forward<Args>(args)...};
             }
             else
             {
                 slot_index = static_cast<std::uint32_t>(slots_.size());
                 slots_.emplace_back();
-                slots_[slot_index].payload = Payload{std::forward<Args>(args)...};
             }
+
+            // Payload is an implicit-lifetime type (trivially copyable per
+            // VkSlotMapPayload), so assigning over a reused slot's next_free index
+            // begins the payload's lifetime without a placement-new or dtor call.
+            slots_[slot_index].payload = Payload{std::forward<Args>(args)...};
 
             slot_t& slot = slots_[slot_index];
             slot.generation = std::max(1u, slot.generation + 1);
@@ -116,9 +118,10 @@ export namespace vkgc
 
             Payload result{slot->payload};
 
-            // Payload is trivially destructible (VkSlotMapPayload), so reusing the
-            // union storage with placement-new ends its lifetime without a dtor call.
-            ::new (static_cast<void*>(&slot->next_free)) std::uint32_t{head_free_};
+            // Payload is trivially destructible (VkSlotMapPayload), so overwriting the
+            // active union member ends its lifetime without a dtor call; uint32_t is an
+            // implicit-lifetime type, so the assignment begins next_free's lifetime.
+            slot->next_free = head_free_;
             head_free_ = handle.index;
             slot->generation = 0;
 
