@@ -82,7 +82,8 @@ For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCM
 - `cmake/Policies.cmake` — `vkgc::cxx_runtime`, `vkgc::warnings`, `vkgc::hardening`, `vkgc::no_exceptions`, `vkgc::diagnostics`, `vkgc::platform_quirks` INTERFACE targets
 - `cmake/Interfaces.cmake` — `vkgc::dependencies::*` (vulkan, windowing, math, concurrency, shaders, stdcxx_extras) and `vkgc::config::cookbook_paths` INTERFACE targets
 - `cmake/ProjectConfig.cmake` — per-chapter helpers `vkgc_configure_chapter_target()` (sets `DEBUG_POSTFIX`) and `vkgc_attach_common_sources()` (attaches common TUs + module units)
-- Chapter `CMakeLists.txt` files are minimal: define the executable, call `vkgc_configure_chapter_target()` and `vkgc_attach_common_sources()`, then `target_link_libraries` against the `vkgc::*` targets they need
+- `cmake/Shaders.cmake` — `vkgc_compile_shaders()`, the standard per-chapter helper compiling Slang sources (relative to `shaders/`) to SPIR-V via the SDK's `slangc` at build time; output mirrors the source tree under `.cache/`, with `-depfile` incremental rebuilds and `shaders/common` auto-included. Slang-only by design — GLSL files belonging to runtime exercises (chapter01/glslang) are not compiled here
+- Chapter `CMakeLists.txt` files are minimal: define the executable, call `vkgc_configure_chapter_target()` and `vkgc_attach_common_sources()` (and `vkgc_compile_shaders()` if the chapter has shaders), then `target_link_libraries` against the `vkgc::*` targets they need
 
 ## Dependencies
 

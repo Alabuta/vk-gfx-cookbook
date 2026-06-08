@@ -48,6 +48,9 @@ include(cmake/Interfaces.cmake)
 # --- Common sources helper (transitional; Phase B will replace with a vkgc::common library) ---
 include(cmake/ProjectConfig.cmake)
 
+# --- Build-time shader compilation (vkgc_compile_shaders) ---
+include(cmake/Shaders.cmake)
+
 # --- Chapter sub-projects ---
 add_subdirectory(src/chapter01/glfw)
 add_subdirectory(src/chapter01/taskflow)

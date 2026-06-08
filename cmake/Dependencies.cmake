@@ -63,6 +63,26 @@ if (VKGC_SLANG_LIBRARY_DEBUG)
     )
 endif ()
 
+# slangc — the Slang command-line compiler, shipped next to the Slang runtime in the SDK's Bin dir.
+# Located separately from the Slang::Slang link target above because it is a build tool, not a link
+# dependency: cmake/Shaders.cmake drives it via add_custom_command to compile .slang sources to SPIR-V
+# at build time. Found here (rather than in Shaders.cmake) so the SDK probing stays in one place.
+find_program(VKGC_SLANGC_EXECUTABLE
+        NAMES slangc
+        HINTS
+            ${Vulkan_INCLUDE_DIR}/../Bin
+            $ENV{VULKAN_SDK}/Bin
+            $ENV{VULKAN_SDK}/bin
+)
+mark_as_advanced(VKGC_SLANGC_EXECUTABLE)
+if (VKGC_SLANGC_EXECUTABLE)
+    message(STATUS "Found slangc: ${VKGC_SLANGC_EXECUTABLE}")
+else ()
+    message(WARNING
+            "slangc not found in the Vulkan SDK — build-time shader compilation "
+            "(vkgc_compile_shaders) will fail. Set VULKAN_SDK or VKGC_SLANGC_EXECUTABLE.")
+endif ()
+
 # Every declaration carries:
 #   * GIT_SHALLOW TRUE — depth-1 clone; all GIT_TAGs are real tags (not SHAs), so shallow is valid
 #                       and cuts cold-configure time meaningfully for large repos (glslang especially).

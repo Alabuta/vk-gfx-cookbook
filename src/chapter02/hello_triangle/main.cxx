@@ -384,8 +384,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
 
-    // slangc chapter02_triangle.slang -profile spirv_1_5 -target spirv -o chapter02_triangle.spv
-    std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter02_triangle.spv"};
+    // Compiled at build time from shaders/chapter02/hello_triangle/chapter02_triangle.slang by the
+    // chapter02_hello_triangle_shaders step (vkgc_compile_shaders in CMakeLists.txt). The .spv mirrors
+    // the source tree under .cache/, so the path matches the shader's location under shaders/.
+    std::filesystem::path const path{
+        std::filesystem::path{kCacheDir} / "chapter02/hello_triangle/chapter02_triangle.spv"};
     auto spirv_words = vkgc::load_binary_file<std::uint32_t>(path);
     if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
     {

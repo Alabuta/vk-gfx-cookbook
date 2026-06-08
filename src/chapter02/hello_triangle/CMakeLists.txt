@@ -3,6 +3,15 @@ add_executable(chapter02_hello_triangle main.cxx)
 vkgc_configure_chapter_target(chapter02_hello_triangle)
 vkgc_attach_common_sources(chapter02_hello_triangle)
 
+vkgc_compile_shaders(chapter02_hello_triangle
+    PROFILE
+        spirv_1_5
+    CAPABILITIES
+        spirv_1_5
+    GLOB
+        chapter02/hello_triangle/*.slang
+)
+
 target_link_libraries(chapter02_hello_triangle
     PRIVATE
         vkgc::cxx_runtime
