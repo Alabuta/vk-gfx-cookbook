@@ -13,9 +13,10 @@
 #include <volk.h>
 #include <vk_mem_alloc.h>
 
-#include <glm/glm.hpp>
+#include "math/glm.hxx"
 
 #include "GLFW/glfw3.h"
+#include "math/pack_unpack.hxx"
 
 #include "vulkan/format.hxx"
 #include "vulkan/assert.hxx"
@@ -210,6 +211,7 @@ static vkgc::vk_buffer_handle create_vertex_buffer(vkgc::vulkan_object_registry&
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
 {
+    // Vulkan context
     vkgc::vulkan_instance vulkan_instance{{.enable_validation{true}}};
     VKGC_VERIFY(vulkan_instance.is_valid());
 
@@ -419,6 +421,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     }
 
     auto const shader_code = std::as_bytes(std::span{spirv_words});
+    VKGC_CHECKF(
+        !shader_code.empty() && shader_code.size() % sizeof(std::uint32_t) == 0, "invalid byte code buffer size");
+
     vkgc::vulkan_extending_structs_chain shader_vertex_stage{
         VkPipelineShaderStageCreateInfo{
             .sType{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO},
@@ -470,21 +475,29 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .primitiveRestartEnable{VK_FALSE}
     };
 
-    struct vertex {
+    struct vertex
+    {
         glm::vec2 position;
-        /*glm::vec3 position;
-        glm::vec3 normal;
-        glm::vec2 uv;*/
+        std::uint32_t uv;
     };
 
-    std::array constexpr vertices{
-        glm::vec2{-.5f, -.5f},
-        glm::vec2{.5f, -.5f},
-        glm::vec2{.0f, .5f}
+    std::array const vertices{
+        vertex{
+            glm::vec2{-.5f, -.5f},
+            vkgc::math::pack_uv_unorm(glm::vec2{0.f, 0.f})
+        },
+        vertex{
+            glm::vec2{.5f, -.5f},
+            vkgc::math::pack_uv_unorm(glm::vec2{1.f, 0.f})
+        },
+        vertex{
+            glm::vec2{.0f, .5f},
+            vkgc::math::pack_uv_unorm(glm::vec2{.5f, 1.f})
+        },
     };
 
-    std::uint32_t constexpr vertex_count{static_cast<std::uint32_t>(vertices.size())};
-    std::size_t constexpr size_in_bytes{sizeof(vertex) * vertex_count};
+    std::uint32_t const vertex_count{static_cast<std::uint32_t>(vertices.size())};
+    std::size_t const size_in_bytes{sizeof(vertex) * vertex_count};
 
     auto const vertex_buffer = create_vertex_buffer(vk_object_registry, size_in_bytes);
     if (!vertex_buffer.is_valid())
@@ -510,13 +523,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 allocation_info.allocationInfo.offset,
                 size_in_bytes,
                 0,
-                &mapped_ptr
-            )))
+                &mapped_ptr)))
         {
             return false;
         }
 
         memcpy(mapped_ptr, vertices.data(), size_in_bytes);
+
+        vkUnmapMemory(vulkan_device.handle(), allocation_info.allocationInfo.deviceMemory);
     }
 
     std::array const binding_descriptions{
@@ -532,10 +546,15 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .location{0},
             .binding{0},
             .format{VK_FORMAT_R32G32_SFLOAT},
-            .offset{0}
+            .offset{offsetof(vertex, position)}
+        },
+        VkVertexInputAttributeDescription{
+            .location{1},
+            .binding{0},
+            .format{VK_FORMAT_R16G16_UNORM},
+            .offset{offsetof(vertex, uv)}
         }
         // { .location = 1, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, normal) },
-        // { .location = 2, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
     };
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state{
@@ -614,7 +633,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .stencilAttachmentFormat{VK_FORMAT_UNDEFINED}
     };
 
-    VkPipelineColorBlendAttachmentState color_blend_attachment_state{
+    VkPipelineColorBlendAttachmentState constexpr color_blend_attachment_state{
         .blendEnable{VK_FALSE},
         .srcColorBlendFactor{},
         .dstColorBlendFactor{},

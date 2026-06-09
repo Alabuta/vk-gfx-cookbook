@@ -1,5 +1,6 @@
 ﻿struct VSInput {
     float2 position;
+    float2 uv;
 };
 
 struct v2p
@@ -13,7 +14,8 @@ v2p main(VSInput input)
 {
     v2p output;
     output.position = float4(input.position, 1., 1.);
-    output.color = float3(.2, .4, .1); // color[vertex_index];
+    // output.color = float3(.2, .4, .1); // color[vertex_index];
+    output.color = float3(input.uv, 0.);
     return output;
 }
 

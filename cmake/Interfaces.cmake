@@ -100,6 +100,14 @@ target_link_libraries(vkgc_dependencies_math
         glm::glm
 )
 
+target_compile_definitions(vkgc_dependencies_math
+    INTERFACE
+        GLM_FORCE_CXX20             # match the project's C++ language level
+        GLM_FORCE_DEPTH_ZERO_TO_ONE # Vulkan clip-space depth is [0, 1], not [-1, 1]
+        GLM_FORCE_RADIANS           # angles in radians (also GLM's modern default)
+        GLM_ENABLE_EXPERIMENTAL     # unlock glm/gtx/* (quaternions, transforms, string_cast)
+)
+
 
 # === vkgc::dependencies::concurrency ===
 # Signal/slot library (Pal::Sigslot) and task-graph runtime (Taskflow). Grouped as concurrency
