@@ -203,7 +203,7 @@ namespace
 
         swapchain_info.pre_transform = capabilities.currentTransform;
 
-        return std::optional{std::move(swapchain_info)};
+        return std::optional{swapchain_info};
     }
 }
 
