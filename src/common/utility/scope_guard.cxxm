@@ -1,0 +1,56 @@
+module;
+
+#include <concepts>
+#include <type_traits>
+#include <utility>
+
+export module vkgc.scope_guard;
+
+export namespace vkgc
+{
+    /*
+     * Runs the stored callable when the enclosing scope exits, unless dismissed.
+     * Intended for ad-hoc cleanup that doesn't warrant a dedicated RAII wrapper:
+     *
+     *     vkgc::scope_guard unmap{[&] { vmaUnmapMemory(allocator, allocation); }};
+     *
+     * Deliberately neither copyable nor movable — the guard pins cleanup to the
+     * scope where it is declared. Call dismiss() on success paths where the
+     * cleanup responsibility is handed off elsewhere.
+     */
+    template <std::invocable Func>
+        requires std::is_nothrow_move_constructible_v<Func>
+    class scope_guard final
+    {
+    public:
+
+        explicit scope_guard(Func fn) noexcept
+            : func_{std::move(fn)}
+        {
+        }
+
+        ~scope_guard()
+        {
+            if (armed_)
+            {
+                func_();
+            }
+        }
+
+        scope_guard(scope_guard const&) = delete;
+        scope_guard(scope_guard&&) = delete;
+
+        scope_guard& operator=(scope_guard const&) = delete;
+        scope_guard& operator=(scope_guard&&) = delete;
+
+        void dismiss() noexcept
+        {
+            armed_ = false;
+        }
+
+    private:
+
+        Func func_;
+        bool armed_{true};
+    };
+}

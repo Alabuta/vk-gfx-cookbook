@@ -80,6 +80,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
                     # platform
                     ${COMMON_DIR}/platform/window.cxxm
 
+                    # utility
+                    ${COMMON_DIR}/utility/scope_guard.cxxm
+
                     # vulkan core
                     ${COMMON_DIR}/vulkan/instance.cxxm
                     ${COMMON_DIR}/vulkan/device.cxxm
