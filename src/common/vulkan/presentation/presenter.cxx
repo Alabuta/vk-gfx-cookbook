@@ -348,7 +348,8 @@ namespace vkgc
         return swapchain_image_acquire_result{
             .image_acquired{image_acquired},
             .present_wait{present_semaphore},
-            .swapchain_image{swapchain_images_[acquired_image_index_]}
+            .swapchain_image{swapchain_images_[acquired_image_index_]},
+            .image_index{acquired_image_index_}
         };
     }
 

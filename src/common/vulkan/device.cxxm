@@ -14,8 +14,11 @@ export namespace vkgc
 {
     struct vulkan_device_info
     {
-        VkSurfaceKHR surface{VK_NULL_HANDLE};
         std::vector<std::string> extensions{};
+
+        // Require a queue family capable of presenting to the platform's window
+        // system. When false the device is windowless (e.g. compute-only).
+        bool presentation_required{true};
     };
 
     struct vulkan_queue_families

@@ -103,6 +103,12 @@ namespace vkgc
             signals_ = nullptr;
         }
 
+        if (surface_ != VK_NULL_HANDLE && instance_ != VK_NULL_HANDLE)
+        {
+            vkDestroySurfaceKHR(instance_, surface_, nullptr);
+            surface_ = VK_NULL_HANDLE;
+        }
+
         if (VKGC_ENSURE(handle_ != nullptr))
         {
             glfwDestroyWindow(handle_);
@@ -130,17 +136,30 @@ namespace vkgc
         return handle_ == nullptr || glfwWindowShouldClose(handle_) == GLFW_TRUE;
     }
 
-    VkSurfaceKHR window::get_vulkan_surface(VkInstance instance) const noexcept
+    bool window::create_surface(VkInstance const instance) noexcept
     {
-        if (surface_ == VK_NULL_HANDLE)
+        if (!VKGC_ENSURE_VKHANDLE(instance) || !VKGC_ENSURE(handle_ != nullptr))
         {
-            if (!VKGC_ENSURE_VKSUCCESS(glfwCreateWindowSurface(instance, handle_, nullptr, &surface_)))
-            {
-                surface_ = VK_NULL_HANDLE;
-                return VK_NULL_HANDLE;
-            }
+            return false;
         }
 
+        if (surface_ != VK_NULL_HANDLE)
+        {
+            return true;
+        }
+
+        if (!VKGC_ENSURE_VKSUCCESS(glfwCreateWindowSurface(instance, handle_, nullptr, &surface_)))
+        {
+            surface_ = VK_NULL_HANDLE;
+            return false;
+        }
+
+        instance_ = instance;
+        return true;
+    }
+
+    VkSurfaceKHR window::surface() const noexcept
+    {
         return surface_;
     }
 

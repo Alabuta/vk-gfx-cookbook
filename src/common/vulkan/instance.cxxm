@@ -10,8 +10,6 @@ module;
 
 export module vkgc.vulkan_instance;
 
-import vkgc.window;
-import vkgc.vulkan_surface;
 import vkgc.vulkan_device;
 
 export namespace vkgc
@@ -43,7 +41,6 @@ export namespace vkgc
         [[nodiscard]] bool is_valid() const noexcept;
         [[nodiscard]] VkInstance handle() const noexcept;
 
-        [[nodiscard]] vulkan_surface create_window_surface(window const& w) noexcept;
         [[nodiscard]] vulkan_device create_device(vulkan_device_info const& info) noexcept;
 
     private:

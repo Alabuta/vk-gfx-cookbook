@@ -13,6 +13,8 @@ module;
 #include <volk.h>
 #include "vulkan/format.hxx"
 
+#include <GLFW/glfw3.h>
+
 #include "assert.hxx"
 
 #include "vk_mem_alloc.h"
@@ -86,8 +88,9 @@ namespace
 
     [[nodiscard]]
     vkgc::vulkan_queue_families select_queue_families(
+        VkInstance instance,
         VkPhysicalDevice physical_device,
-        VkSurfaceKHR surface) noexcept
+        bool const presentation_required) noexcept
     {
         auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
 
@@ -97,11 +100,9 @@ namespace
         std::vector<VkQueueFamilyProperties> families(families_count);
         vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &families_count, families.data());
 
-        bool const presentation_support_required = surface != VK_NULL_HANDLE;
-
         vkgc::vulkan_queue_families queue_families;
 
-        // Main: graphics (+ presentation if a surface is provided)
+        // Main: graphics (+ platform presentation if required)
         for (std::uint32_t family_index{0}; family_index < families_count; ++family_index)
         {
             if (families[family_index].queueCount == 0)
@@ -114,18 +115,13 @@ namespace
                 continue;
             }
 
-            if (presentation_support_required)
+            // Windowless presentation-capability check: queried at the platform level
+            // (no surface needed). The surface-specific support is validated later when
+            // the swapchain is built against the actual surface.
+            if (presentation_required &&
+                glfwGetPhysicalDevicePresentationSupport(instance, physical_device, family_index) != GLFW_TRUE)
             {
-                VkBool32 surface_supported{VK_FALSE};
-                if (auto const result = vkGetPhysicalDeviceSurfaceSupportKHR(
-                        physical_device,
-                        family_index,
-                        surface,
-                        &surface_supported);
-                    result != VK_SUCCESS || surface_supported != VK_TRUE)
-                {
-                    continue;
-                }
+                continue;
             }
 
             queue_families.main = family_index;
@@ -249,8 +245,8 @@ namespace
     [[nodiscard]]
     std::pair<VkPhysicalDevice, vkgc::vulkan_queue_families> select_physical_device(
         VkInstance instance,
-        VkSurfaceKHR surface,
-        std::span<char const* const> const required_extensions) noexcept
+        std::span<char const* const> const required_extensions,
+        bool const presentation_required) noexcept
     {
         auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
 
@@ -301,7 +297,7 @@ namespace
                 continue;
             }
 
-            auto queue_families = select_queue_families(physical_device, surface);
+            auto queue_families = select_queue_families(instance, physical_device, presentation_required);
             if (queue_families.main == invalid_family_index)
             {
                 continue;
@@ -369,7 +365,10 @@ namespace vkgc
 
         auto const extensions = build_device_extensions(info.extensions);
 
-        auto [physical_device, queue_families] = select_physical_device(handle_, info.surface, extensions);
+        auto [physical_device, queue_families] = select_physical_device(
+            handle_,
+            extensions,
+            info.presentation_required);
         if (!VKGC_ENSUREF_VKHANDLE(physical_device, "failed to pick physical device"))
         {
             return {};

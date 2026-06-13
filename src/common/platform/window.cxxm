@@ -63,8 +63,14 @@ export namespace vkgc
         [[nodiscard]]
         bool should_close() const noexcept;
 
+        // Creates the window's Vulkan surface and takes ownership of it; the window
+        // destroys it in ~window, so `instance` must outlive the window. Idempotent:
+        // a second call with the surface already created is a no-op returning true.
         [[nodiscard]]
-        VkSurfaceKHR get_vulkan_surface(VkInstance instance) const noexcept;
+        bool create_surface(VkInstance instance) noexcept;
+
+        [[nodiscard]]
+        VkSurfaceKHR surface() const noexcept;
 
         [[nodiscard]]
         slot_connection connect_on_resize(resize_slot_t slot);
@@ -72,7 +78,9 @@ export namespace vkgc
     private:
 
         GLFWwindow* handle_{nullptr};
-        mutable VkSurfaceKHR surface_{VK_NULL_HANDLE};
+
+        VkInstance instance_{VK_NULL_HANDLE};
+        VkSurfaceKHR surface_{VK_NULL_HANDLE};
 
         std::pair<std::uint32_t, std::uint32_t> size_;
 

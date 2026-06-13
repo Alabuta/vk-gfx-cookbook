@@ -53,11 +53,11 @@ function(vkgc_attach_common_sources TARGET_NAME)
             ${COMMON_DIR}/vulkan/device.cxx
             ${COMMON_DIR}/vulkan/device_creation.cxx
             ${COMMON_DIR}/vulkan/device_features.cxx
+            ${COMMON_DIR}/vulkan/context.cxx
             ${COMMON_DIR}/vulkan/frame_ring.cxx
             ${COMMON_DIR}/vulkan/vma_implementation.cxx
 
             # vulkan/presentation
-            ${COMMON_DIR}/vulkan/presentation/surface.cxx
             ${COMMON_DIR}/vulkan/presentation/presenter.cxx
 
             # vulkan/registry
@@ -87,10 +87,10 @@ function(vkgc_attach_common_sources TARGET_NAME)
                     ${COMMON_DIR}/vulkan/instance.cxxm
                     ${COMMON_DIR}/vulkan/device.cxxm
                     ${COMMON_DIR}/vulkan/device_features.cxxm
+                    ${COMMON_DIR}/vulkan/context.cxxm
                     ${COMMON_DIR}/vulkan/frame_ring.cxxm
 
                     # vulkan/presentation
-                    ${COMMON_DIR}/vulkan/presentation/surface.cxxm
                     ${COMMON_DIR}/vulkan/presentation/presenter.cxxm
 
                     # vulkan/registry

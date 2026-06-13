@@ -1,6 +1,8 @@
 module;
 
 #include <cstdint>
+#include <span>
+#include <vector>
 
 #include <volk.h>
 #include "vk_mem_alloc.h"
@@ -23,6 +25,27 @@ export namespace vkgc
         vk_buffer_handle buffer{};
         vk_allocation_handle memory{};
     };
+
+    // Creates one image view per swapchain image, in image-index order: the
+    // returned vector is indexed by the same index the presenter reports in
+    // swapchain_image_acquire_result::image_index. Returns an empty vector on
+    // failure, destroying any views already created.
+    [[nodiscard]]
+    std::vector<vk_image_view_handle> create_swapchain_image_views(
+        vulkan_object_registry& resources,
+        std::span<VkImage const> images,
+        VkFormat format);
+
+    // Creates a dedicated device-local depth attachment (image + matching depth-aspect
+    // view) of the given format and extent. On success writes both handles and returns
+    // true; on failure destroys anything already created and returns false.
+    [[nodiscard]]
+    bool create_depth_attachment(
+        vulkan_object_registry& resources,
+        VkFormat image_format,
+        VkExtent3D image_extent,
+        vk_image_handle& image,
+        vk_image_view_handle& image_view);
 
     [[nodiscard]]
     bool bind_image_memory(

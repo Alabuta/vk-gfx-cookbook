@@ -49,6 +49,7 @@ export namespace vkgc
         vk_bin_semaphore_handle image_acquired{};
         vk_bin_semaphore_handle present_wait{};
         VkImage swapchain_image{};
+        std::uint32_t image_index{};
     };
 
     enum class present_status

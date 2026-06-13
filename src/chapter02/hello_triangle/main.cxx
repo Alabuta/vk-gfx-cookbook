@@ -7,7 +7,7 @@
 #include <utility>
 #include <vector>
 #include <array>
-
+#include <ranges>
 #include <filesystem>
 
 #include <volk.h>
@@ -21,16 +21,13 @@
 #include "vulkan/format.hxx"
 #include "vulkan/assert.hxx"
 
-#include <ranges>
-
-// constexpr std::string_view kShaderDir = COOKBOOK_SHADER_DIR_STRING;
-constexpr std::string_view kCacheDir = COOKBOOK_CACHE_DIR_STRING;
+std::string_view constexpr kCacheDir{COOKBOOK_CACHE_DIR_STRING};
 
 import vkgc.bootstrap;
 import vkgc.file_io;
 import vkgc.window;
 import vkgc.vulkan_instance;
-import vkgc.vulkan_surface;
+import vkgc.vulkan_context;
 import vkgc.vulkan_device;
 import vkgc.vulkan_handle;
 import vkgc.vulkan_object_registry;
@@ -42,135 +39,6 @@ import vkgc.vulkan_helpers;
 namespace vkgc
 {
     std::uint32_t constexpr kFramesInFlight{2}; // belongs to renderer settings
-}
-
-[[nodiscard]]
-static std::unordered_map<VkImage, vkgc::vk_image_view_handle> create_swapchain_image_views(
-    vkgc::vulkan_object_registry& vk_object_registry,
-    std::span<VkImage const> const images,
-    VkFormat const format)
-{
-    std::unordered_map<VkImage, vkgc::vk_image_view_handle> image_view_handles;
-    image_view_handles.reserve(images.size());
-
-    for (std::uint32_t i{0}; auto image_handle : images)
-    {
-        VkImageViewCreateInfo const create_info{
-            .sType{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO},
-            .pNext{nullptr},
-            .flags{0},
-            .image{image_handle},
-            .viewType{VK_IMAGE_VIEW_TYPE_2D},
-            .format{format},
-            .components{
-                .r{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .g{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .b{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .a{VK_COMPONENT_SWIZZLE_IDENTITY}
-            },
-            .subresourceRange{
-                .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
-                .baseMipLevel{0},
-                .levelCount{1},
-                .baseArrayLayer{0},
-                .layerCount{1}
-            }
-        };
-
-        auto const debug_name = std::format("swapchain image [#{}]", i++);
-        if (auto const view = vk_object_registry.create_image_view(create_info, debug_name.c_str()); view.is_valid())
-        {
-            image_view_handles.emplace(image_handle, view);
-            continue;
-        }
-
-        for (auto const image_view_handle : image_view_handles | std::views::values)
-        {
-            vk_object_registry.destroy_immediate(image_view_handle);
-        }
-
-        return {};
-    }
-
-    return image_view_handles;
-}
-
-[[nodiscard]]
-static bool create_depth_attachment(
-    vkgc::vulkan_object_registry& vk_object_registry,
-    VkFormat const image_format,
-    VkExtent3D const image_extent,
-    vkgc::vk_image_handle& image,
-    vkgc::vk_image_view_handle& image_view)
-{
-    VkImageCreateInfo const image_create_info{
-        .sType{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO},
-        .pNext{nullptr},
-        .flags{0},
-        .imageType{VK_IMAGE_TYPE_2D},
-        .format{image_format},
-        .extent{image_extent},
-        .mipLevels{1},
-        .arrayLayers{1},
-        .samples{VK_SAMPLE_COUNT_1_BIT},
-        .tiling{VK_IMAGE_TILING_OPTIMAL},
-        .usage{VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT},
-        .sharingMode{VK_SHARING_MODE_EXCLUSIVE},
-        .queueFamilyIndexCount{0},
-        .pQueueFamilyIndices{nullptr},
-        .initialLayout{VK_IMAGE_LAYOUT_UNDEFINED}
-    };
-
-    VmaAllocationCreateInfo constexpr allocation_create_info{
-        .flags{VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT},
-        .usage{VMA_MEMORY_USAGE_UNKNOWN},
-        .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-        .preferredFlags{0},
-        .memoryTypeBits{0},
-        .pool{VK_NULL_HANDLE},
-        .pUserData{nullptr},
-        .priority{0}
-    };
-
-    image = vk_object_registry.create_memory_bound_image(
-        image_create_info,
-        allocation_create_info,
-        "depth attachment image");
-    if (!image.is_valid())
-    {
-        return false;
-    }
-
-    VkImageViewCreateInfo const depth_view_create_info{
-        .sType{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO},
-        .pNext{nullptr},
-        .flags{0},
-        .image{vk_object_registry.resolve_handle(image)},
-        .viewType{VK_IMAGE_VIEW_TYPE_2D},
-        .format{image_format},
-        .components{
-            .r{VK_COMPONENT_SWIZZLE_IDENTITY},
-            .g{VK_COMPONENT_SWIZZLE_IDENTITY},
-            .b{VK_COMPONENT_SWIZZLE_IDENTITY},
-            .a{VK_COMPONENT_SWIZZLE_IDENTITY}
-        },
-        .subresourceRange{
-            .aspectMask{VK_IMAGE_ASPECT_DEPTH_BIT},
-            .baseMipLevel{0},
-            .levelCount{1},
-            .baseArrayLayer{0},
-            .layerCount{1}
-        }
-    };
-
-    image_view = vk_object_registry.create_image_view(depth_view_create_info, "depth attachment image view");
-    if (!image_view.is_valid())
-    {
-        vk_object_registry.destroy_immediate(image);
-        return false;
-    }
-
-    return true;
 }
 
 [[nodiscard]]
@@ -187,7 +55,7 @@ static vkgc::vk_buffer_handle create_vertex_buffer(vkgc::vulkan_object_registry&
         .flags{0},
         .size{static_cast<VkDeviceSize>(size)},
         .usage{VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
-        .sharingMode{VK_SHARING_MODE_EXCLUSIVE },
+        .sharingMode{VK_SHARING_MODE_EXCLUSIVE},
         .queueFamilyIndexCount{0},
         .pQueueFamilyIndices{nullptr},
     };
@@ -211,23 +79,14 @@ static vkgc::vk_buffer_handle create_vertex_buffer(vkgc::vulkan_object_registry&
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
 {
-    // Vulkan context
-    vkgc::vulkan_instance vulkan_instance{{.enable_validation{true}}};
-    VKGC_VERIFY(vulkan_instance.is_valid());
+    vkgc::vulkan_context vk_context{{.instance{.enable_validation{true}}}};
+    VKGC_VERIFY(vk_context.is_valid());
 
-    vkgc::window window{"Swapchain example", width, height};
+    vkgc::window window{"Hello triangle", width, height};
     VKGC_VERIFY(window.is_valid());
+    VKGC_VERIFY(window.create_surface(vk_context.instance().handle()));
 
-    vkgc::vulkan_surface const window_surface = vulkan_instance.create_window_surface(window);
-    VKGC_VERIFY(window_surface.is_valid());
-
-    vkgc::vulkan_device vulkan_device = vulkan_instance.create_device({
-        .surface{window_surface.handle()},
-        .extensions{}
-    });
-    VKGC_VERIFY(vulkan_device.is_valid());
-
-    vkgc::vulkan_object_registry vk_object_registry{vulkan_device};
+    vkgc::vulkan_object_registry vk_object_registry{vk_context.device()};
 
     vkgc::swapchain_params swapchain_params{
         .preferred_surface_formats{
@@ -252,12 +111,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     };
 
     vkgc::vulkan_presenter presenter{
-        vulkan_device,
+        vk_context.device(),
         vk_object_registry,
-        window_surface.handle(),
+        window.surface(),
         vkgc::kFramesInFlight,
-        swapchain_params
-    };
+        swapchain_params};
     VKGC_VERIFY(presenter.is_valid());
 
     auto connect_on_resize = window.connect_on_resize(
@@ -268,10 +126,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             presenter.request_rebuild();
         });
 
-    auto swapchain_image_view_handles = create_swapchain_image_views(
-        vk_object_registry,
-        presenter.images(),
-        presenter.surface_format().format);
+    auto swapchain_image_view_handles =
+        vkgc::create_swapchain_image_views(vk_object_registry, presenter.images(), presenter.surface_format().format);
     if (swapchain_image_view_handles.empty())
     {
         std::println(stderr, "[Vulkan] : Error : failed to crate swapchain image views");
@@ -284,17 +140,15 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
         .pNext{nullptr},
         .flags{VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT},
-        .queueFamilyIndex{vulkan_device.main_queue_family_index()}
+        .queueFamilyIndex{vk_context.device().main_queue_family_index()}
     });
     if (!main_queue_command_pool.is_valid())
     {
         return false;
     }
 
-    auto const command_buffers = vk_object_registry.allocate_command_buffers(
-        main_queue_command_pool,
-        vkgc::kFramesInFlight,
-        true);
+    auto const command_buffers =
+        vk_object_registry.allocate_command_buffers(main_queue_command_pool, vkgc::kFramesInFlight, true);
     if (command_buffers.empty())
     {
         return false;
@@ -309,7 +163,10 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .formatProperties{}
         };
 
-        vkGetPhysicalDeviceFormatProperties2(vulkan_device.physical_device(), preferred_depth_format, &fmt_properties);
+        vkGetPhysicalDeviceFormatProperties2(
+            vk_context.device().physical_device(),
+            preferred_depth_format,
+            &fmt_properties);
 
         auto const optimal_tiling_features = fmt_properties.formatProperties.optimalTilingFeatures;
         if ((optimal_tiling_features & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0)
@@ -327,7 +184,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     vkgc::vk_image_handle depth_attachment_image;
     vkgc::vk_image_view_handle depth_attachment_image_view;
 
-    if (!create_depth_attachment(
+    if (!vkgc::create_depth_attachment(
             vk_object_registry,
             depth_attachment_format,
             {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
@@ -345,32 +202,30 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return true;
         }
 
-        VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(vulkan_device.handle()));
+        VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(vk_context.device().handle()));
 
         vk_object_registry.destroy_immediate(depth_attachment_image_view);
         vk_object_registry.destroy_immediate(depth_attachment_image);
 
-        for (auto const image_view_handle : swapchain_image_view_handles | std::views::values)
+        for (auto const image_view_handle : swapchain_image_view_handles)
         {
             vk_object_registry.destroy_immediate(image_view_handle);
         }
         swapchain_image_view_handles.clear();
 
         swapchain_params.framebuffer_extent = {.width{width}, .height{height}};
-        presenter.recreate_swapchain(window_surface.handle(), swapchain_params);
+        presenter.recreate_swapchain(window.surface(), swapchain_params);
         VKGC_VERIFYF(presenter.is_valid(), "unexpected error occurred while recreating the swapchain");
 
-        swapchain_image_view_handles = create_swapchain_image_views(
-            vk_object_registry,
-            presenter.images(),
-            presenter.surface_format().format);
+        swapchain_image_view_handles =
+            vkgc::create_swapchain_image_views(vk_object_registry, presenter.images(), presenter.surface_format().format);
         if (swapchain_image_view_handles.empty())
         {
             std::println(stderr, "[Vulkan] : Error : failed to crate swapchain image views");
             return false;
         }
 
-        if (!create_depth_attachment(
+        if (!vkgc::create_depth_attachment(
                 vk_object_registry,
                 depth_attachment_format,
                 {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
@@ -462,10 +317,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
     };
 
-    std::array shader_stages{
-        *shader_vertex_stage.as_pointer(),
-        *shader_fragment_stage.as_pointer()
-    };
+    std::array shader_stages{*shader_vertex_stage.as_pointer(), *shader_fragment_stage.as_pointer()};
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state{
         .sType{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO},
@@ -510,15 +362,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     {
         VmaAllocationInfo2 allocation_info;
         vmaGetAllocationInfo2(
-            vulkan_device.vma_allocator(),
+            vk_context.device().vma_allocator(),
             vk_object_registry.resolve_handle(vertex_buffer_memory),
-            &allocation_info
-        );
+            &allocation_info);
 
         void* mapped_ptr;
         if (!VKGC_ENSURE_VKSUCCESS(
             vkMapMemory(
-                vulkan_device.handle(),
+                vk_context.device().handle(),
                 allocation_info.allocationInfo.deviceMemory,
                 allocation_info.allocationInfo.offset,
                 size_in_bytes,
@@ -530,7 +381,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         memcpy(mapped_ptr, vertices.data(), size_in_bytes);
 
-        vkUnmapMemory(vulkan_device.handle(), allocation_info.allocationInfo.deviceMemory);
+        vkUnmapMemory(vk_context.device().handle(), allocation_info.allocationInfo.deviceMemory);
     }
 
     std::array const binding_descriptions{
@@ -663,7 +514,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .flags{0},
         .depthClampEnable{VK_TRUE},
         .rasterizerDiscardEnable{VK_FALSE},
-        .polygonMode{VK_POLYGON_MODE_FILL },
+        .polygonMode{VK_POLYGON_MODE_FILL},
         .cullMode{VK_CULL_MODE_BACK_BIT},
         .frontFace{VK_FRONT_FACE_COUNTER_CLOCKWISE},
         .depthBiasEnable{VK_FALSE},
@@ -786,7 +637,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 "unexpected error occurred while acquiring the swapchain image");
         }
 
-        auto [swapchain_image_acquired_semaphore, present_wait_semaphore, swapchain_image] = acquired.value();
+        auto [
+            swapchain_image_acquired_semaphore,
+            present_wait_semaphore,
+            swapchain_image,
+            swapchain_image_index] = acquired.value();
 
         auto const swapchain_image_acquired_semaphore_raw = vk_object_registry.resolve_handle(
             swapchain_image_acquired_semaphore);
@@ -896,7 +751,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
 
         auto const swapchain_image_view_handle = vk_object_registry.resolve_handle(
-            swapchain_image_view_handles[swapchain_image]);
+            swapchain_image_view_handles[swapchain_image_index]);
         if (!VKGC_ENSURE_VKHANDLE(swapchain_image_view_handle))
         {
             return false;
@@ -1099,7 +954,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             };
 
             VKGC_VERIFYF_VKSUCCESS(
-                vkQueueSubmit2(vulkan_device.main_queue(), 1, &submit_info, VK_NULL_HANDLE),
+                vkQueueSubmit2(vk_context.device().main_queue(), 1, &submit_info, VK_NULL_HANDLE),
                 "failed to submit [#{}] frame render command buffer",
                 frame_slot_index);
         }
@@ -1110,7 +965,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         // End render loop
 
-        switch (presenter.request_presentation(vulkan_device.main_queue()))
+        switch (presenter.request_presentation(vk_context.device().main_queue()))
         {
         case vkgc::present_status::ok:
             break;

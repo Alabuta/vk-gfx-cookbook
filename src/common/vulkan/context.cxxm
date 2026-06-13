@@ -1,0 +1,41 @@
+export module vkgc.vulkan_context;
+
+import vkgc.vulkan_instance;
+import vkgc.vulkan_device;
+
+export namespace vkgc
+{
+    struct vulkan_context_info
+    {
+        vulkan_instance_info instance{};
+        vulkan_device_info device{};
+    };
+
+    class vulkan_context final
+    {
+    public:
+
+        explicit vulkan_context(vulkan_context_info const& info) noexcept;
+        ~vulkan_context();
+
+        vulkan_context(vulkan_context const&) = delete;
+        vulkan_context(vulkan_context&&) = delete;
+
+        vulkan_context& operator=(vulkan_context const&) = delete;
+        vulkan_context& operator=(vulkan_context&&) = delete;
+
+        [[nodiscard]]
+        bool is_valid() const noexcept;
+
+        [[nodiscard]]
+        vulkan_instance const& instance() const noexcept;
+
+        [[nodiscard]]
+        vulkan_device const& device() const noexcept;
+
+    private:
+
+        vulkan_instance instance_;
+        vulkan_device device_;
+    };
+}
