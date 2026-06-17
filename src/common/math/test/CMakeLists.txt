@@ -34,3 +34,30 @@ target_link_libraries(vkgc_math_pack_unpack_test
         vkgc::dependencies::math
         vkgc::dependencies::stdcxx_extras
 )
+
+# Sibling exercise for math/transforms.hxx — same header-only, math-only link
+# surface as the pack_unpack test above.
+add_executable(vkgc_math_transforms_test transforms_test.cxx)
+
+vkgc_configure_chapter_target(vkgc_math_transforms_test)
+
+target_include_directories(vkgc_math_transforms_test
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/common
+)
+
+target_link_libraries(vkgc_math_transforms_test
+    PRIVATE
+        vkgc::cxx_runtime
+        vkgc::warnings
+        vkgc::hardening
+        vkgc::no_exceptions
+        vkgc::sanitizers::address
+        vkgc::sanitizers::undefined
+        vkgc::diagnostics
+        vkgc::platform_quirks
+
+        vkgc::dependencies::math
+        vkgc::dependencies::stdcxx_extras
+)
