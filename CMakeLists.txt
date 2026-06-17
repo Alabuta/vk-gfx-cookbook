@@ -57,6 +57,7 @@ add_subdirectory(src/chapter01/taskflow)
 add_subdirectory(src/chapter01/glslang)
 add_subdirectory(src/chapter02/swapchain)
 add_subdirectory(src/chapter02/hello_triangle)
+add_subdirectory(src/chapter02/glm)
 
 # --- Common-code tests ---
 add_subdirectory(src/common/math/test)
