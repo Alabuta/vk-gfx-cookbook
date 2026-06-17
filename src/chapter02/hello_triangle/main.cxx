@@ -130,7 +130,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         vkgc::create_swapchain_image_views(vk_object_registry, presenter.images(), presenter.surface_format().format);
     if (swapchain_image_view_handles.empty())
     {
-        std::println(stderr, "[Vulkan] : Error : failed to crate swapchain image views");
+        std::println(stderr, "[Vulkan] : Error : failed to create swapchain image views");
         return false;
     }
 
@@ -221,7 +221,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             vkgc::create_swapchain_image_views(vk_object_registry, presenter.images(), presenter.surface_format().format);
         if (swapchain_image_view_handles.empty())
         {
-            std::println(stderr, "[Vulkan] : Error : failed to crate swapchain image views");
+            std::println(stderr, "[Vulkan] : Error : failed to create swapchain image views");
             return false;
         }
 
