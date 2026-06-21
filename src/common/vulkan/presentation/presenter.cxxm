@@ -144,6 +144,7 @@ export namespace vkgc
         std::vector<vk_bin_semaphore_handle> image_acquired_semaphores_{};
         std::vector<vk_bin_semaphore_handle> present_semaphores_{};
 
+        bool is_valid_{false};
         bool needs_rebuild_{false};
 
         void create_swapchain(VkSurfaceKHR surface, VkSwapchainKHR old_handle, swapchain_params const& swapchain_params);

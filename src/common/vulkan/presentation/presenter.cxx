@@ -20,7 +20,7 @@ module vkgc.vulkan_presenter;
 import vkgc.vulkan_device;
 import vkgc.vulkan_handle;
 import vkgc.vulkan_object_registry;
-
+import vkgc.scope_guard;
 
 namespace
 {
@@ -213,7 +213,7 @@ namespace vkgc
         vulkan_device const& device,
         vulkan_object_registry& object_registry,
         VkSurfaceKHR surface,
-        std::uint32_t frames_in_flight,
+        std::uint32_t const frames_in_flight,
         swapchain_params const& swapchain_params)
         : device_{device},
           object_registry_{object_registry}
@@ -229,15 +229,7 @@ namespace vkgc
             return;
         }
 
-        query_swapchain_images();
-        if (!VKGC_ENSURE(!swapchain_images_.empty()))
-        {
-            vkDestroySwapchainKHR(device_.handle(), swapchain_handle_, nullptr);
-            swapchain_handle_ = VK_NULL_HANDLE;
-            return;
-        }
-
-        if (!VKGC_ENSURE(create_semaphores(frames_in_flight, static_cast<std::uint32_t>(swapchain_images_.size()))))
+        scope_guard cleanup{[&]
         {
             destroy_semaphores();
 
@@ -245,7 +237,25 @@ namespace vkgc
             swapchain_handle_ = VK_NULL_HANDLE;
 
             swapchain_images_.clear();
+        }};
+
+        query_swapchain_images();
+        if (!VKGC_ENSURE(!swapchain_images_.empty()))
+        {
+            return;
         }
+
+        auto const semaphores_created = create_semaphores(
+            frames_in_flight,
+            static_cast<std::uint32_t>(swapchain_images_.size()));
+
+        if (!VKGC_ENSURE(semaphores_created))
+        {
+            return;
+        }
+
+        is_valid_ = true;
+        cleanup.dismiss();
     }
 
     vulkan_presenter::~vulkan_presenter()
@@ -256,7 +266,7 @@ namespace vkgc
             return;
         }
 
-        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_handle));
+        VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(device_handle));
 
         destroy_semaphores();
 
@@ -269,7 +279,7 @@ namespace vkgc
 
     bool vulkan_presenter::is_valid() const noexcept
     {
-        return swapchain_handle_ != VK_NULL_HANDLE;
+        return is_valid_;
     }
 
     VkSwapchainKHR vulkan_presenter::swapchain_handle() const noexcept
@@ -401,7 +411,7 @@ namespace vkgc
             return;
         }
 
-        VKGC_CHECK_VKSUCCESS(vkDeviceWaitIdle(device_.handle()));
+        VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(device_.handle()));
 
         swapchain_images_.clear();
 
