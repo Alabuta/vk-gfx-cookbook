@@ -37,6 +37,11 @@ export namespace vkgc
         std::vector<vertex_attribute> attributes;
     };
 
+    // Byte size of one vertex attribute stored in `format`. Covers the formats
+    // the vertex generators emit; aborts via VKGC_CHECKF on anything else.
+    [[nodiscard]]
+    std::uint32_t format_size(VkFormat format);
+
     [[nodiscard]]
     std::vector<VkVertexInputAttributeDescription> to_attribute_descriptions(vertex_layout const& layout);
 
