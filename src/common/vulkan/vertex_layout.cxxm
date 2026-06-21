@@ -1,0 +1,45 @@
+module;
+
+#include <cstdint>
+#include <vector>
+
+#include <volk.h>
+
+export module vkgc.vulkan_vertex_layout;
+
+export namespace vkgc
+{
+    enum class attribute_semantic : std::uint8_t
+    {
+        position,
+        normal,
+        texcoord,
+        color
+    };
+
+    // One interleaved attribute within a vertex: what it means, how it is packed
+    // (VkFormat), where it sits in the vertex, and which binding it belongs to.
+    // A generator computes the attribute's value, then writes it at
+    // `vertex_index * vertex_layout::stride + offset` in the `format` encoding.
+    struct vertex_attribute
+    {
+        attribute_semantic semantic;
+        VkFormat format;
+        std::uint32_t offset;
+        std::uint32_t binding;
+    };
+
+    // Describes a single interleaved vertex: its byte stride and the attributes
+    // packed into it. Drives both what a generator computes and how it packs.
+    struct vertex_layout
+    {
+        std::uint32_t stride;
+        std::vector<vertex_attribute> attributes;
+    };
+
+    [[nodiscard]]
+    std::vector<VkVertexInputAttributeDescription> to_attribute_descriptions(vertex_layout const& layout);
+
+    [[nodiscard]]
+    std::vector<VkVertexInputBindingDescription> to_binding_descriptions(vertex_layout const& layout);
+}
