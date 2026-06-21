@@ -16,7 +16,9 @@ namespace vkgc
 {
     namespace file_io_detail
     {
-        void check_size_is_multiple(std::size_t const byte_count, std::size_t const element_size)
+        void check_size_is_multiple(
+            [[maybe_unused]] std::size_t const byte_count,
+            [[maybe_unused]] std::size_t const element_size)
         {
             VKGC_CHECK(byte_count % element_size == 0);
         }
