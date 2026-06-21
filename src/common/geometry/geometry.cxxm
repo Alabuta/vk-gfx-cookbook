@@ -1,0 +1,73 @@
+module;
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+
+#include <volk.h>
+
+#include "math/glm.hxx"
+
+export module vkgc.geometry;
+
+import vkgc.vulkan_vertex_layout;
+
+export namespace vkgc::geometry
+{
+    // Parameters for a parametric, origin-centered box.
+    //
+    //   - width/height/depth span [-w/2, w/2] x [-h/2, h/2] x [-d/2, d/2]
+    //     (the sign of a dimension is ignored — extents are symmetric).
+    //   - segments subdivides each axis independently; a 0 is clamped to 1.
+    //   - topology selects the emitted primitive (the full list/strip matrix).
+    //   - index_type == VK_INDEX_TYPE_NONE_KHR yields a non-indexed mesh; UINT16
+    //     / UINT32 yield an index buffer of that width. Strip / line-strip
+    //     topologies are indexed-only (they need primitive restart to separate
+    //     per-row and per-face runs — see generate_box).
+    //   - face_colors feeds the COLOR attribute, one solid color per face in the
+    //     order +X, -X, +Y, -Y, +Z, -Z.
+    struct box_params
+    {
+        float width{1.f};
+        float height{1.f};
+        float depth{1.f};
+
+        glm::uvec3 segments{1u, 1u, 1u};
+
+        VkPrimitiveTopology topology{VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
+        VkIndexType index_type{VK_INDEX_TYPE_UINT16};
+
+        std::vector<glm::vec4> face_colors{};
+    };
+
+    // Number of vertices the box occupies in the vertex buffer for `p`. For an
+    // indexed mesh this is the shared per-face grid vertex count; for a
+    // non-indexed mesh it is the expanded primitive vertex count (topology
+    // dependent).
+    [[nodiscard]] std::uint32_t box_vertex_count(box_params const& p);
+
+    // Number of indices written for `p`, or 0 when non-indexed. Includes the
+    // primitive-restart tokens emitted between runs for strip/line-strip.
+    [[nodiscard]] std::uint32_t box_index_count(box_params const& p);
+
+    // Generate the box described by `p` into caller-provided buffers, packing
+    // each vertex per `layout`. `vertices` must hold at least
+    // box_vertex_count(p) * layout.stride bytes; when indexed, `indices` must
+    // hold at least box_index_count(p) * sizeof(index) bytes (otherwise it is
+    // ignored). Programmer errors — undersized spans, an unsupported
+    // (semantic, format) pair, UINT16 index overflow, or a non-indexed strip
+    // topology — abort via VKGC_CHECKF.
+    //
+    // Winding is counter-clockwise as seen from outside the box, to match a
+    // front-face = CCW, back-face-culled pipeline. Strip and line-strip runs are
+    // separated by the primitive-restart index (0xFFFF for UINT16, 0xFFFFFFFF
+    // for UINT32), so a pipeline rendering those topologies MUST set
+    // primitiveRestartEnable = VK_TRUE. Triangle/line/point *lists* need no
+    // restart.
+    void generate_box(
+        box_params const& params,
+        vertex_layout const& layout,
+        std::span<std::byte> vertices,
+        std::span<std::byte> indices);
+}
