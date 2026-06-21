@@ -18,6 +18,7 @@
 #include "math/transforms.hxx"
 
 #include "GLFW/glfw3.h"
+#include "glm/gtc/matrix_inverse.hpp"
 #include "math/pack_unpack.hxx"
 
 #include "vulkan/format.hxx"
@@ -37,6 +38,8 @@ import vkgc.vulkan_resource_helpers;
 import vkgc.vulkan_presenter;
 import vkgc.vulkan_frame_ring;
 import vkgc.vulkan_helpers;
+import vkgc.geometry;
+import vkgc.vulkan_vertex_layout;
 
 namespace vkgc
 {
@@ -57,6 +60,42 @@ static vkgc::vk_buffer_handle create_vertex_buffer(vkgc::vulkan_object_registry&
         .flags{0},
         .size{static_cast<VkDeviceSize>(size)},
         .usage{VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
+        .sharingMode{VK_SHARING_MODE_EXCLUSIVE},
+        .queueFamilyIndexCount{0},
+        .pQueueFamilyIndices{nullptr},
+    };
+
+    VmaAllocationCreateInfo constexpr buffer_allocation_info{
+        .flags{
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT
+        },
+        .usage{VMA_MEMORY_USAGE_AUTO},
+        .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+        .preferredFlags{0},
+        .memoryTypeBits{0},
+        .pool{VK_NULL_HANDLE},
+        .pUserData{nullptr},
+        .priority{0}
+    };
+
+    return resources.create_memory_bound_buffer(buffer_create_info, buffer_allocation_info);
+}
+
+[[nodiscard]]
+static vkgc::vk_buffer_handle create_index_buffer(vkgc::vulkan_object_registry& resources, std::size_t const size)
+{
+    if (!VKGC_ENSURE(size > 0))
+    {
+        return {};
+    }
+
+    VkBufferCreateInfo const buffer_create_info{
+        .sType{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .size{static_cast<VkDeviceSize>(size)},
+        .usage{VK_BUFFER_USAGE_INDEX_BUFFER_BIT},
         .sharingMode{VK_SHARING_MODE_EXCLUSIVE},
         .queueFamilyIndexCount{0},
         .pQueueFamilyIndices{nullptr},
@@ -138,12 +177,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     vkgc::vulkan_frame_ring frame_ring{vk_object_registry, vkgc::kFramesInFlight};
 
-    auto const main_queue_command_pool = vk_object_registry.create_command_pool({
-        .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
-        .pNext{nullptr},
-        .flags{VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT},
-        .queueFamilyIndex{vk_context.device().main_queue_family_index()}
-    });
+    auto const main_queue_command_pool = vk_object_registry.create_command_pool(
+        VkCommandPoolCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT | VK_COMMAND_POOL_CREATE_TRANSIENT_BIT},
+            .queueFamilyIndex{vk_context.device().main_queue_family_index()}
+        }
+    );
     if (!main_queue_command_pool.is_valid())
     {
         return false;
@@ -219,8 +260,10 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         presenter.recreate_swapchain(window.surface(), swapchain_params);
         VKGC_VERIFYF(presenter.is_valid(), "unexpected error occurred while recreating the swapchain");
 
-        swapchain_image_view_handles =
-            vkgc::create_swapchain_image_views(vk_object_registry, presenter.images(), presenter.surface_format().format);
+        swapchain_image_view_handles = vkgc::create_swapchain_image_views(
+            vk_object_registry,
+            presenter.images(),
+            presenter.surface_format().format);
         if (swapchain_image_view_handles.empty())
         {
             std::println(stderr, "[Vulkan] : Error : failed to create swapchain image views");
@@ -252,12 +295,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     auto const shader_code = std::as_bytes(std::span{spirv_words});
     VKGC_CHECKF(
-        !shader_code.empty() && shader_code.size() % sizeof(std::uint32_t) == 0, "invalid byte code buffer size");
+        !shader_code.empty() && shader_code.size() % sizeof(std::uint32_t) == 0,
+        "invalid byte code buffer size");
 
     struct specialization_data
     {
         VkBool32 enable_wireframe{VK_FALSE};
     };
+
     specialization_data constexpr spec_data{};
 
     std::array constexpr specialization_map_entry{
@@ -323,55 +368,78 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .primitiveRestartEnable{VK_FALSE}
     };
 
-    struct vertex
-    {
-        glm::vec3 position;
-        glm::vec3 color;
+    using vkgc::attribute_semantic;
+
+    // Interleaved layout the cube shader consumes: position, color (all 3x float32, stride 36).
+    vkgc::vertex_layout const vertex_layout{
+        .stride{28u},
+        .attributes{
+            {attribute_semantic::position, VK_FORMAT_R32G32B32_SFLOAT, 0u, 0u},
+            {attribute_semantic::normal, VK_FORMAT_R16G16_SNORM, 24u, 0u}
+        }
     };
 
-    std::array constexpr vertices{
-        vertex{
-            glm::vec3{-.5f, -.5f, 0.f},
-            glm::vec3{1.f, 0.f, 0.f}
-        },
-        vertex{
-            glm::vec3{.5f, -.5f, 0.f},
-            glm::vec3{0.f, 0.f, 1.f}
-        },
-        vertex{
-            glm::vec3{0.f, .5f, 0.f},
-            glm::vec3{0.f, 1.f, 0.f}
-        },
+    // A unit cube: indexed triangle list, one solid color per face (defaults).
+    vkgc::geometry::box_params const box_params{
+        .segments{ 4u, 2u, 3u },
+        .index_type{VK_INDEX_TYPE_UINT16},
+        .face_colors{
+            glm::vec4{0.90f, 0.25f, 0.25f, 1.f}, // +X
+            glm::vec4{0.55f, 0.15f, 0.15f, 1.f}, // -X
+            glm::vec4{0.30f, 0.80f, 0.35f, 1.f}, // +Y
+            glm::vec4{0.18f, 0.48f, 0.22f, 1.f}, // -Y
+            glm::vec4{0.30f, 0.50f, 0.90f, 1.f}, // +Z
+            glm::vec4{0.18f, 0.30f, 0.58f, 1.f}  // -Z
+        }
     };
 
-    std::uint32_t constexpr vertex_count{static_cast<std::uint32_t>(vertices.size())};
-    std::size_t constexpr size_in_bytes{sizeof(vertex) * vertex_count};
+    auto const vertex_count = vkgc::geometry::box_vertex_count(box_params);
+    auto const index_count = vkgc::geometry::box_index_count(box_params);
+    auto const index_size = box_params.index_type == VK_INDEX_TYPE_UINT16
+        ? sizeof(std::uint16_t)
+        : sizeof(std::uint32_t);
 
-    auto const vertex_buffer = create_vertex_buffer(vk_object_registry, size_in_bytes);
+    std::vector<std::byte> vertex_data(static_cast<std::size_t>(vertex_count) * vertex_layout.stride);
+    std::vector<std::byte> index_data(static_cast<std::size_t>(index_count) * index_size);
+    vkgc::geometry::generate_box(box_params, vertex_layout, vertex_data, index_data);
+
+    auto const vertex_buffer = create_vertex_buffer(vk_object_registry, vertex_data.size());
     if (!vertex_buffer.is_valid())
     {
         return false;
     }
 
-    if (auto const vertex_buffer_memory = vk_object_registry.bound_allocation(vertex_buffer);
-        VKGC_ENSURE(vertex_buffer_memory.is_valid()))
+    auto const index_buffer = create_index_buffer(vk_object_registry, index_data.size());
+    if (!index_buffer.is_valid())
     {
+        return false;
+    }
+
+    auto const upload_buffer = [&](vkgc::vk_buffer_handle const buffer, std::span<std::byte const> const bytes)
+    {
+        auto const allocation = vk_object_registry.bound_allocation(buffer);
+        if (!VKGC_ENSURE(allocation.is_valid()))
+        {
+            return false;
+        }
+
         VkMemoryPropertyFlags memory_property_flags;
         vmaGetAllocationMemoryProperties(
             vk_context.device().vma_allocator(),
-            vk_object_registry.resolve_handle(vertex_buffer_memory),
+            vk_object_registry.resolve_handle(allocation),
             &memory_property_flags);
 
         if (!VKGC_ENSUREF(
-            (memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0,
-            "non-host-coherent memory type requires explicit sync (flush)"))
+                (memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0,
+                "non-host-coherent memory type requires explicit sync (flush)"))
         {
             return false;
         }
 
         if (!VKGC_ENSUREF(
-            (memory_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0,
-            "fallback scenario: memory [{:#06x}] is a non-mappable memory, use a staging buffer", memory_property_flags))
+                (memory_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0,
+                "fallback scenario: memory [{:#06x}] is a non-mappable memory, use a staging buffer",
+                memory_property_flags))
         {
             return false;
         }
@@ -379,49 +447,40 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         VmaAllocationInfo2 allocation_info;
         vmaGetAllocationInfo2(
             vk_context.device().vma_allocator(),
-            vk_object_registry.resolve_handle(vertex_buffer_memory),
+            vk_object_registry.resolve_handle(allocation),
             &allocation_info);
 
         void* mapped_ptr;
         if (!VKGC_ENSURE_VKSUCCESS(
-            vkMapMemory(
-                vk_context.device().handle(),
-                allocation_info.allocationInfo.deviceMemory,
-                allocation_info.allocationInfo.offset,
-                size_in_bytes,
-                0,
-                &mapped_ptr)))
+                vkMapMemory(
+                    vk_context.device().handle(),
+                    allocation_info.allocationInfo.deviceMemory,
+                    allocation_info.allocationInfo.offset,
+                    bytes.size(),
+                    0,
+                    &mapped_ptr)))
         {
             return false;
         }
 
-        std::memcpy(mapped_ptr, vertices.data(), size_in_bytes);
+        std::memcpy(mapped_ptr, bytes.data(), bytes.size());
 
         vkUnmapMemory(vk_context.device().handle(), allocation_info.allocationInfo.deviceMemory);
+        return true;
+    };
+
+    if (!upload_buffer(vertex_buffer, vertex_data))
+    {
+        return false;
     }
 
-    std::array constexpr binding_descriptions{
-        VkVertexInputBindingDescription{
-            .binding{0},
-            .stride{sizeof(vertex)},
-            .inputRate{VK_VERTEX_INPUT_RATE_VERTEX}
-       }
-    };
+    if (!upload_buffer(index_buffer, index_data))
+    {
+        return false;
+    }
 
-    std::array constexpr attribute_descriptions{
-        VkVertexInputAttributeDescription{
-            .location{0},
-            .binding{0},
-            .format{VK_FORMAT_R32G32B32_SFLOAT},
-            .offset{offsetof(vertex, position)}
-        },
-        VkVertexInputAttributeDescription{
-            .location{1},
-            .binding{0},
-            .format{VK_FORMAT_R32G32B32_SFLOAT},
-            .offset{offsetof(vertex, color)}
-        }
-    };
+    auto const binding_descriptions = vkgc::to_binding_descriptions(vertex_layout);
+    auto const attribute_descriptions = vkgc::to_attribute_descriptions(vertex_layout);
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state{
         .sType{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO},
@@ -436,6 +495,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     struct per_frame_shader_data
     {
         glm::mat4 mvp;
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 normal;
     };
 
     VkPushConstantRange constexpr push_constant_range{
@@ -445,7 +507,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     };
 
     auto const pipeline_layout = vk_object_registry.create_pipeline_layout(
-        {
+        VkPipelineLayoutCreateInfo{
             .sType{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO},
             .pNext{nullptr},
             .flags{0},
@@ -476,11 +538,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     };
 
     VkPipelineDynamicStateCreateInfo const pipeline_dynamic_state{
-       .sType{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO},
-       .pNext{nullptr},
-       .flags{0},
-       .dynamicStateCount{static_cast<std::uint32_t>(dynamic_states.size())},
-       .pDynamicStates{dynamic_states.data()}
+        .sType{VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO},
+        .pNext{nullptr},
+        .flags{0},
+        .dynamicStateCount{static_cast<std::uint32_t>(dynamic_states.size())},
+        .pDynamicStates{dynamic_states.data()}
     };
 
     VkPipelineDepthStencilStateCreateInfo constexpr depth_stencil_state{
@@ -636,25 +698,33 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return true;
         }
 
-        glm::mat4 constexpr view_point{glm::translate(glm::identity<glm::mat4>(), glm::vec3{0.f, 0.f, 1.f})};
-        glm::mat4 constexpr model{glm::translate(glm::identity<glm::mat4>(), glm::vec3{0.f, 0.f, 0.f})};
+        glm::mat4 constexpr view_point{glm::translate(glm::identity<glm::mat4>(), glm::vec3{0.f, 0.f, 2.f})};
+
+        // Spin the cube so all six faces become visible over time.
+        auto const time = static_cast<float>(glfwGetTime());
+        glm::mat4 model = glm::rotate(
+            glm::identity<glm::mat4>(),
+            time * glm::radians(45.f),
+            glm::normalize(glm::vec3{.5f, 1.f, 0.f}));
 
         auto const aspect = static_cast<float>(width) / static_cast<float>(height);
-        auto proj = vkgc::math::rperspective(
-            glm::radians(90.f),
-            aspect,
-            .01f,
-            1'000.f);
+        auto proj = vkgc::math::rperspective(glm::radians(90.f), aspect, .01f, 1'000.f);
 
         auto view = glm::inverse(view_point);
+        auto normal = glm::inverseTranspose(view * model);
 
-        per_frame_shader_data const shader_data{.mvp{proj * view * model}};
+        per_frame_shader_data const shader_data{
+            .mvp{proj * view * model},
+            .model{model},
+            .view{view},
+            .normal{normal}
+        };
 
         std::uint32_t const frame_slot_index = frame_ring.begin_frame(frame_index);
         if (!VKGC_ENSUREF(
-            frame_slot_index != std::numeric_limits<std::uint32_t>::max(),
-            "failed to begin [#{}] frame slot",
-            frame_slot_index))
+                frame_slot_index != std::numeric_limits<std::uint32_t>::max(),
+                "failed to begin [#{}] frame slot",
+                frame_slot_index))
         {
             return false;
         }
@@ -683,8 +753,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             swapchain_image,
             swapchain_image_index] = acquired.value();
 
-        auto const swapchain_image_acquired_semaphore_raw = vk_object_registry.resolve_handle(
-            swapchain_image_acquired_semaphore);
+        auto const swapchain_image_acquired_semaphore_raw =
+            vk_object_registry.resolve_handle(swapchain_image_acquired_semaphore);
         if (!VKGC_ENSURE_VKHANDLE(swapchain_image_acquired_semaphore_raw))
         {
             return false;
@@ -703,8 +773,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
 
         if (!VKGC_ENSUREF_VKSUCCESS(
-            vkResetCommandBuffer(command_buffer, 0),
-            "failed to reset [#{}] frame render command buffer", frame_slot_index))
+                vkResetCommandBuffer(command_buffer, 0),
+                "failed to reset [#{}] frame render command buffer",
+                frame_slot_index))
         {
             return false;
         }
@@ -718,8 +789,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             };
 
             if (!VKGC_ENSUREF_VKSUCCESS(
-                vkBeginCommandBuffer(command_buffer, &begin_info),
-                "failed to begin [#{}] frame render command buffer record", frame_slot_index))
+                    vkBeginCommandBuffer(command_buffer, &begin_info),
+                    "failed to begin [#{}] frame render command buffer record",
+                    frame_slot_index))
             {
                 return false;
             }
@@ -790,8 +862,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             vkCmdPipelineBarrier2(command_buffer, &dependency_info);
         }
 
-        auto const swapchain_image_view_handle = vk_object_registry.resolve_handle(
-            swapchain_image_view_handles[swapchain_image_index]);
+        auto const swapchain_image_view_handle =
+            vk_object_registry.resolve_handle(swapchain_image_view_handles[swapchain_image_index]);
         if (!VKGC_ENSURE_VKHANDLE(swapchain_image_view_handle))
         {
             return false;
@@ -826,7 +898,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .resolveImageLayout{VK_IMAGE_LAYOUT_UNDEFINED},
             .loadOp{VK_ATTACHMENT_LOAD_OP_CLEAR},
             .storeOp{VK_ATTACHMENT_STORE_OP_DONT_CARE},
-            .clearValue {.depthStencil{0.f, 0}}
+            .clearValue{.depthStencil{0.f, 0}}
         };
 
         auto const [render_width, render_height] = presenter.surface_extent();
@@ -858,9 +930,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         };
         vkCmdSetViewport(command_buffer, 0, 1, &viewport);
 
-        VkRect2D const scissor{
-            .offset{0, 0}, .extent{render_width, render_height}
-        };
+        VkRect2D const scissor{.offset{0, 0}, .extent{render_width, render_height}};
         vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
         auto const pipeline_handle = vk_object_registry.resolve_handle(pipeline);
@@ -892,7 +962,15 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         vkCmdBindVertexBuffers(command_buffer, 0, 1, &vertex_buffer_handle, &buffer_offset);
 
-        vkCmdDraw(command_buffer, vertex_count, 1, 0, 0);
+        auto const index_buffer_handle = vk_object_registry.resolve_handle(index_buffer);
+        if (!VKGC_ENSURE_VKHANDLE(index_buffer_handle))
+        {
+            return false;
+        }
+
+        vkCmdBindIndexBuffer(command_buffer, index_buffer_handle, 0, box_params.index_type);
+
+        vkCmdDrawIndexed(command_buffer, index_count, 1, 0, 0, 0);
 
         vkCmdEndRendering(command_buffer);
 
@@ -935,8 +1013,9 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
 
         if (!VKGC_ENSUREF_VKSUCCESS(
-            vkEndCommandBuffer(command_buffer),
-            "failed to end [#{}] frame render command buffer record", frame_slot_index))
+                vkEndCommandBuffer(command_buffer),
+                "failed to end [#{}] frame render command buffer record",
+                frame_slot_index))
         {
             return false;
         }
