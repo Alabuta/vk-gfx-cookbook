@@ -28,14 +28,25 @@ QualifierAlignment: Right
 # When a paren/brace list breaks, break after the opening bracket and place the
 # closing bracket on its own line (closing `}` of a multi-line braced initializer
 # lands on its own line; single-line lists stay compact).
+#
+# NOTE — a twofold rule clang-format cannot express: the hand style puts the
+# closing `}` of a designated-initializer struct on its own line, but hugs the
+# closing `)` of a multi-line function call against the last argument. A single
+# AlignAfterOpenBracket governs both, so BlockIndent is chosen to match the
+# (dominant) struct form; running the formatter will move call-closing `)` onto
+# their own line. That divergence is accepted, not fought — do NOT switch to
+# DontAlign to "fix" it, as that reflows every struct closer instead.
 AlignAfterOpenBracket: BlockIndent
 AlignOperands: Align
 LambdaBodyIndentation: OuterScope
 
 # Bin packing: each parameter / argument / designated initializer on its own line
-# once the list is broken across lines.
+# once the list is broken across lines. AllowAllArgumentsOnNextLine:false keeps a
+# wrapped list exploded one-per-line (matching the hand-written Vulkan structs)
+# rather than collapsing a short one back onto a single line.
 BinPackParameters: false
 BinPackArguments: false
+AllowAllArgumentsOnNextLine: false
 
 # Short forms
 AllowShortFunctionsOnASingleLine: Inline
