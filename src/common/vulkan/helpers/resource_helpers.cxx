@@ -1,5 +1,6 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <print>
@@ -20,6 +21,57 @@ import vkgc.scope_guard;
 
 namespace vkgc
 {
+    namespace
+    {
+        vk_buffer_handle create_host_writable_buffer(
+            vulkan_object_registry& resources,
+            std::size_t const size,
+            VkBufferUsageFlags const usage)
+        {
+            if (!VKGC_ENSURE(size > 0))
+            {
+                return {};
+            }
+
+            VkBufferCreateInfo const buffer_create_info{
+                .sType{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO},
+                .pNext{nullptr},
+                .flags{0},
+                .size{static_cast<VkDeviceSize>(size)},
+                .usage{usage},
+                .sharingMode{VK_SHARING_MODE_EXCLUSIVE},
+                .queueFamilyIndexCount{0},
+                .pQueueFamilyIndices{nullptr},
+            };
+
+            VmaAllocationCreateInfo constexpr buffer_allocation_info{
+                .flags{
+                    VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                    VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT
+                },
+                .usage{VMA_MEMORY_USAGE_AUTO},
+                .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                .preferredFlags{0},
+                .memoryTypeBits{0},
+                .pool{VK_NULL_HANDLE},
+                .pUserData{nullptr},
+                .priority{0}
+            };
+
+            return resources.create_memory_bound_buffer(buffer_create_info, buffer_allocation_info);
+        }
+    }
+
+    vk_buffer_handle create_vertex_buffer(vulkan_object_registry& resources, std::size_t const size)
+    {
+        return create_host_writable_buffer(resources, size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    }
+
+    vk_buffer_handle create_index_buffer(vulkan_object_registry& resources, std::size_t const size)
+    {
+        return create_host_writable_buffer(resources, size, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    }
+
     std::vector<vk_image_view_handle> create_swapchain_image_views(
         vulkan_object_registry& resources,
         std::span<VkImage const> const images,

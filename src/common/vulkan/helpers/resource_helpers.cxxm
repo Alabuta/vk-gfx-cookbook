@@ -1,5 +1,6 @@
 module;
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -46,6 +47,15 @@ export namespace vkgc
         VkExtent3D image_extent,
         vk_image_handle& image,
         vk_image_view_handle& image_view);
+
+    // Creates a host-writable, device-local buffer of `size` bytes for the given
+    // role. The allocation is mappable for direct upload; returns an invalid
+    // handle when `size` is zero.
+    [[nodiscard]]
+    vk_buffer_handle create_vertex_buffer(vulkan_object_registry& resources, std::size_t size);
+
+    [[nodiscard]]
+    vk_buffer_handle create_index_buffer(vulkan_object_registry& resources, std::size_t size);
 
     [[nodiscard]]
     bool bind_image_memory(
