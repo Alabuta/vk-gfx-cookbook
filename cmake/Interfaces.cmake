@@ -106,6 +106,7 @@ target_compile_definitions(vkgc_dependencies_math
         GLM_FORCE_DEPTH_ZERO_TO_ONE # Vulkan clip-space depth is [0, 1], not [-1, 1]
         GLM_FORCE_RADIANS           # angles in radians (also GLM's modern default)
         GLM_ENABLE_EXPERIMENTAL     # unlock glm/gtx/* (quaternions, transforms, string_cast)
+        $<$<NOT:$<CONFIG:Debug>>:GLM_FORCE_INLINE>
 )
 
 

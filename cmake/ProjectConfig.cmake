@@ -56,6 +56,7 @@ function(vkgc_attach_common_sources TARGET_NAME)
             ${COMMON_DIR}/vulkan/context.cxx
             ${COMMON_DIR}/vulkan/frame_ring.cxx
             ${COMMON_DIR}/vulkan/vma_implementation.cxx
+            ${COMMON_DIR}/vulkan/vertex_layout.cxx
 
             # vulkan/presentation
             ${COMMON_DIR}/vulkan/presentation/presenter.cxx
@@ -66,6 +67,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
 
             # vulkan/helpers
             ${COMMON_DIR}/vulkan/helpers/resource_helpers.cxx
+
+            # geometry
+            ${COMMON_DIR}/geometry/box.cxx
 
         PRIVATE
             FILE_SET cookbook_modules TYPE CXX_MODULES
@@ -89,6 +93,7 @@ function(vkgc_attach_common_sources TARGET_NAME)
                     ${COMMON_DIR}/vulkan/device_features.cxxm
                     ${COMMON_DIR}/vulkan/context.cxxm
                     ${COMMON_DIR}/vulkan/frame_ring.cxxm
+                    ${COMMON_DIR}/vulkan/vertex_layout.cxxm
 
                     # vulkan/presentation
                     ${COMMON_DIR}/vulkan/presentation/presenter.cxxm
@@ -104,6 +109,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
                     # vulkan/utility
                     ${COMMON_DIR}/vulkan/utility/ext_structs_chain.cxxm
                     ${COMMON_DIR}/vulkan/utility/slot_map.cxxm
+
+                    # geometry
+                    ${COMMON_DIR}/geometry/geometry.cxxm
     )
 
 endfunction()
