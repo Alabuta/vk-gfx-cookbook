@@ -32,10 +32,7 @@
  *     ...
  */
 
-#include "glm/gtx/norm.hpp"
 #include "math/glm.hxx"
-
-#include <glm/gtc/packing.hpp>
 
 #include <cmath>
 #include <concepts>

@@ -12,10 +12,6 @@ module;
 #include "math/pack_unpack.hxx"
 #include "diagnostic/assert.hxx"
 
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/packing.hpp>
-
 module vkgc.geometry;
 
 import vkgc.vulkan_vertex_layout;
@@ -393,8 +389,9 @@ namespace vkgc::geometry
 
             if (params.index_type == VK_INDEX_TYPE_UINT16)
             {
+                static_assert(std::numeric_limits<std::uint16_t>::max() > 0);
                 VKGC_CHECKF(
-                    vertex_count < std::numeric_limits<std::uint16_t>::max() - 1,
+                    vertex_count < static_cast<std::uint32_t>(std::numeric_limits<std::uint16_t>::max() - 1),
                     "UINT16 index overflow: {} vertices exceed 65534 (restart token reserved)",
                     vertex_count);
             }

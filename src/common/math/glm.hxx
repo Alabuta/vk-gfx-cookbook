@@ -22,3 +22,20 @@
  */
 
 #include <glm/glm.hpp>
+
+#include <glm/gtc/constants.hpp>
+/*#include <glm/ext/scalar_common.hpp>
+#include <glm/ext/scalar_constants.hpp>
+#include <glm/ext/scalar_ulp.hpp>
+#include <glm/ext/vector_common.hpp>
+#include <glm/ext/vector_ulp.hpp>*/
+
+#include <glm/gtc/matrix_access.hpp>
+#include "glm/gtc/matrix_inverse.hpp"
+#include <glm/gtc/matrix_transform.hpp>
+
+#include <glm/gtc/packing.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/ulp.hpp>
+
+#include "glm/gtx/norm.hpp"

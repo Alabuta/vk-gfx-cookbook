@@ -18,7 +18,6 @@
 #include "math/transforms.hxx"
 
 #include "GLFW/glfw3.h"
-#include "glm/gtc/matrix_inverse.hpp"
 #include "math/pack_unpack.hxx"
 
 #include "vulkan/format.hxx"
