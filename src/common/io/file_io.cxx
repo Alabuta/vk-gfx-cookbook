@@ -1,12 +1,14 @@
 module;
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <ios>
 #include <print>
 #include <span>
 #include <system_error>
+#include <vector>
 
 #include "diagnostic/assert.hxx"
 
@@ -14,15 +16,39 @@ module vkgc.file_io;
 
 namespace vkgc
 {
-    namespace file_io_detail
+    template <typename T>
+    std::vector<T> load_binary_file(std::filesystem::path const& path)
     {
-        void check_size_is_multiple(
-            [[maybe_unused]] std::size_t const byte_count,
-            [[maybe_unused]] std::size_t const element_size)
+        std::ifstream file{path, std::ios::in | std::ios::binary | std::ios::ate};
+
+        if (file.fail())
         {
-            VKGC_CHECK(byte_count % element_size == 0);
+            return {};
         }
+
+        std::streamsize const chars_count = file.tellg();
+        if (chars_count < 1)
+        {
+            return {};
+        }
+
+        file.seekg(0, std::ios::beg);
+
+        VKGC_CHECK(static_cast<std::size_t>(chars_count) % sizeof(T) == 0);
+
+        std::vector<T> bytes(static_cast<std::size_t>(chars_count) / sizeof(T));
+        file.read(reinterpret_cast<std::istream::char_type*>(bytes.data()), chars_count);
+
+        if (file.fail())
+        {
+            return {};
+        }
+
+        return bytes;
     }
+
+    template std::vector<std::uint32_t> load_binary_file<std::uint32_t>(std::filesystem::path const&);
+    template std::vector<std::byte> load_binary_file<std::byte>(std::filesystem::path const&);
 
     bool save_binary_file(std::filesystem::path const& path, std::span<std::byte const> const bytes)
     {
