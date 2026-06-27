@@ -8,6 +8,30 @@
 # each chapter executable as TUs; Phase B extracts them to a vkgc::common OBJECT/STATIC library,
 # turning call sites into `target_link_libraries(<target> PRIVATE vkgc::common)`.
 
+# Standalone-binary support: clang64/libc++ links libc++.dll dynamically, so a binary launched
+# outside a CLANG64 shell can't find it. Locate the runtime DLL next to the compiler so
+# vkgc_configure_chapter_target can stage it beside each executable. Clang-MSYS only (the GNU-
+# frontend clang that defaults to -stdlib=libc++); sanitized builds are dev-only and run from
+# the shell, so skip them.
+if (WIN32
+        AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "GNU"
+        AND NOT VKGC_ENABLE_ASAN
+        AND NOT VKGC_ENABLE_UBSAN)
+
+    get_filename_component(_vkgc_cxx_bindir "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    find_file(VKGC_LIBCXX_DLL
+            NAMES libc++.dll
+            PATHS "${_vkgc_cxx_bindir}"
+            NO_DEFAULT_PATH)
+    unset(_vkgc_cxx_bindir)
+
+    if (NOT VKGC_LIBCXX_DLL)
+        message(STATUS
+                "vkgc: libc++.dll not found beside the compiler; executables will need it on PATH")
+    endif ()
+endif ()
+
 function(vkgc_configure_chapter_target TARGET_NAME)
 
     if (NOT TARGET "${TARGET_NAME}")
@@ -19,6 +43,14 @@ function(vkgc_configure_chapter_target TARGET_NAME)
         PROPERTIES
             DEBUG_POSTFIX .dbg
     )
+
+    if (VKGC_LIBCXX_DLL)
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${VKGC_LIBCXX_DLL}" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                COMMENT "Staging libc++.dll next to ${TARGET_NAME}"
+                VERBATIM)
+    endif ()
 
 endfunction()
 
