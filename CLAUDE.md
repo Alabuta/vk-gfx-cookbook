@@ -98,6 +98,8 @@ For one-off configures bypassing presets entirely, `cmake -B <dir> -G Ninja -DCM
 | sigslot | 1.2.2 | FetchContent (GitHub) — exposes `Pal::Sigslot` |
 | glslang | 16.2.0 | FetchContent (GitHub) — `ENABLE_OPT=OFF` to skip the SPIRV-Tools bootstrap |
 | Slang | bundled | Vulkan SDK — located by hand (FindVulkan has no `slang` component), wrapped in imported `Slang::Slang` |
+| cgltf | v1.15 | FetchContent (GitHub) — header-only glTF 2.0 loader; `SOURCE_SUBDIR` skips its build, exposed via `vkgc::dependencies::model_loading` |
+| stb | pinned commit | FetchContent (GitHub) — header-only `stb_image.h`; no upstream tags, pinned to a master SHA (no `GIT_SHALLOW`), exposed via `vkgc::dependencies::model_loading` |
 | X11 | system | Required on Linux only |
 
 ## Compiler Configuration
