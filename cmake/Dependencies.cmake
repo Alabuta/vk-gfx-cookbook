@@ -192,4 +192,31 @@ FetchContent_Declare(
         FIND_PACKAGE_ARGS 1.2.2
 )
 
-FetchContent_MakeAvailable(volk glm glfw taskflow glslang VulkanMemoryAllocator sigslot)
+# === cgltf === (header-only glTF 2.0 loader; include-only)
+# SOURCE_SUBDIR points at a directory that holds no CMakeLists.txt, so MakeAvailable populates the
+# source tree (exposing cgltf.h via cgltf_SOURCE_DIR) but skips add_subdirectory — we never build the
+# upstream test targets. Consumed through vkgc::dependencies::model_loading in cmake/Interfaces.cmake.
+FetchContent_Declare(
+        cgltf
+        GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
+        GIT_TAG        v1.15
+        GIT_SHALLOW    TRUE
+        EXCLUDE_FROM_ALL
+        SYSTEM
+        SOURCE_SUBDIR  do-not-build
+)
+
+# === stb === (header-only image loader; stb_image.h)
+# Upstream ships no tags/releases, so this pins a master commit (unlike the all-real-tags convention
+# noted above). GIT_SHALLOW is omitted on purpose: a depth-1 clone of an arbitrary SHA isn't reliable
+# across Git servers. SOURCE_SUBDIR skips add_subdirectory (stb has no root CMakeLists anyway).
+FetchContent_Declare(
+        stb
+        GIT_REPOSITORY https://github.com/nothings/stb.git
+        GIT_TAG        31c1ad37456438565541f4919958214b6e762fb4
+        EXCLUDE_FROM_ALL
+        SYSTEM
+        SOURCE_SUBDIR  do-not-build
+)
+
+FetchContent_MakeAvailable(volk glm glfw taskflow glslang VulkanMemoryAllocator sigslot cgltf stb)

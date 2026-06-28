@@ -113,6 +113,23 @@ target_compile_definitions(vkgc_dependencies_math
 )
 
 
+# === vkgc::dependencies::model_loading ===
+# Header-only asset loaders: cgltf (glTF 2.0) and stb_image. No link libraries — the libraries are
+# pure headers, so this target only exposes their source dirs as include paths. SYSTEM is essential:
+# the chapter TU that defines CGLTF_IMPLEMENTATION / STB_IMAGE_IMPLEMENTATION compiles their C bodies,
+# which don't survive this project's -Werror -Wconversion. cgltf_SOURCE_DIR / stb_SOURCE_DIR are set
+# by FetchContent_MakeAvailable in cmake/Dependencies.cmake (included before this file).
+
+add_library(vkgc_dependencies_model_loading INTERFACE)
+add_library(vkgc::dependencies::model_loading ALIAS vkgc_dependencies_model_loading)
+
+target_include_directories(vkgc_dependencies_model_loading SYSTEM
+    INTERFACE
+        ${cgltf_SOURCE_DIR}
+        ${stb_SOURCE_DIR}
+)
+
+
 # === vkgc::dependencies::concurrency ===
 # Signal/slot library (Pal::Sigslot) and task-graph runtime (Taskflow). Grouped as concurrency
 # primitives — chapters that use one tend to need the other.
@@ -237,5 +254,6 @@ target_compile_definitions(vkgc_config_cookbook_paths
     INTERFACE
         COOKBOOK_SHADER_DIR_STRING="${CMAKE_SOURCE_DIR}/shaders/"
         COOKBOOK_CACHE_DIR_STRING="${CMAKE_SOURCE_DIR}/.cache/"
+        COOKBOOK_ASSET_DIR_STRING="${CMAKE_SOURCE_DIR}/assets/"
         COOKBOOK_LOADER_SETTINGS_FILE_STRING="${CMAKE_SOURCE_DIR}/vk_loader_settings.json"
 )
