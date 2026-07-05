@@ -105,7 +105,6 @@ target_compile_options(vkgc_warnings
             -Wduplicated-cond
             -Wduplicated-branches
             -Wlogical-op
-            -Wuseless-cast
         ">"
 
         "$<${IS_CLANG_CL}:"

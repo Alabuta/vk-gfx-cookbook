@@ -11,29 +11,18 @@ module;
 export module vkgc.vulkan_resource_helpers;
 
 import vkgc.vulkan_handle;
+import vkgc.vulkan_context;
 import vkgc.vulkan_object_registry;
 
 export namespace vkgc
 {
-    struct image_with_memory
-    {
-        vk_image_handle image{};
-        vk_allocation_handle memory{};
-    };
-
-    struct buffer_with_memory
-    {
-        vk_buffer_handle buffer{};
-        vk_allocation_handle memory{};
-    };
-
     // Creates one image view per swapchain image, in image-index order: the
     // returned vector is indexed by the same index the presenter reports in
     // swapchain_image_acquire_result::image_index. Returns an empty vector on
     // failure, destroying any views already created.
     [[nodiscard]]
     std::vector<vk_image_view_handle> create_swapchain_image_views(
-        vulkan_object_registry& resources,
+        vulkan_object_registry& vk_object_registry,
         std::span<VkImage const> images,
         VkFormat format);
 
@@ -42,20 +31,26 @@ export namespace vkgc
     // true; on failure destroys anything already created and returns false.
     [[nodiscard]]
     bool create_depth_attachment(
-        vulkan_object_registry& resources,
+        vulkan_object_registry& vk_object_registry,
         VkFormat image_format,
         VkExtent3D image_extent,
         vk_image_handle& image,
         vk_image_view_handle& image_view);
 
     // Creates a host-writable, device-local buffer of `size` bytes for the given
-    // role. The allocation is mappable for direct upload; returns an invalid
-    // handle when `size` is zero.
+    // role, also usable as a transfer destination when the allocation ends up
+    // non-mappable. Returns an invalid handle when `size` is zero.
     [[nodiscard]]
-    vk_buffer_handle create_vertex_buffer(vulkan_object_registry& resources, std::size_t size);
+    vk_buffer_handle create_vertex_buffer(vulkan_object_registry& vk_object_registry, std::size_t size);
 
     [[nodiscard]]
-    vk_buffer_handle create_index_buffer(vulkan_object_registry& resources, std::size_t size);
+    vk_buffer_handle create_index_buffer(vulkan_object_registry& vk_object_registry, std::size_t size);
+
+    // Creates a host-visible, persistently mapped staging buffer of `size` bytes
+    // for use as a transfer source. The caller populates it through the mapping
+    // reported by get_vma_allocation_info; returns an invalid handle when `size` is zero.
+    [[nodiscard]]
+    vk_buffer_handle create_staging_buffer(vulkan_object_registry& vk_object_registry, std::size_t size);
 
     [[nodiscard]]
     bool bind_image_memory(
@@ -68,4 +63,16 @@ export namespace vkgc
         vulkan_object_registry const& resources,
         vk_buffer_handle buffer,
         vk_allocation_handle memory);
+
+    [[nodiscard]]
+    VkMemoryPropertyFlags get_allocation_memory_properties(
+        vulkan_context const& vk_context,
+        vulkan_object_registry const& vk_object_registry,
+        vk_allocation_handle allocation);
+
+    [[nodiscard]]
+    VmaAllocationInfo2 get_vma_allocation_info(
+        vulkan_context const& vk_context,
+        vulkan_object_registry const& vk_object_registry,
+        vk_allocation_handle allocation);
 }

@@ -101,13 +101,13 @@ namespace
             return result;
         }
 
-        for (cgltf_size m = 0; m < data->meshes_count; ++m)
+        for (cgltf_size mesh_idx = 0; mesh_idx < data->meshes_count; ++mesh_idx)
         {
-            cgltf_mesh const& mesh = data->meshes[m];
+            cgltf_mesh const& mesh = data->meshes[mesh_idx];
 
-            for (cgltf_size p = 0; p < mesh.primitives_count; ++p)
+            for (cgltf_size primitive_idx = 0; primitive_idx < mesh.primitives_count; ++primitive_idx)
             {
-                cgltf_primitive const& primitive = mesh.primitives[p];
+                cgltf_primitive const& primitive = mesh.primitives[primitive_idx];
                 if (primitive.type != cgltf_primitive_type_triangles)
                 {
                     continue;
@@ -118,9 +118,9 @@ namespace
                 cgltf_accessor const* colors{nullptr};
                 cgltf_accessor const* texcoords{nullptr};
 
-                for (cgltf_size a = 0; a < primitive.attributes_count; ++a)
+                for (cgltf_size attribute_idx = 0; attribute_idx < primitive.attributes_count; ++attribute_idx)
                 {
-                    cgltf_attribute const& attribute = primitive.attributes[a];
+                    cgltf_attribute const& attribute = primitive.attributes[attribute_idx];
                     switch (attribute.type)
                     {
                     case cgltf_attribute_type_position:
@@ -130,10 +130,16 @@ namespace
                         normals = attribute.data;
                         break;
                     case cgltf_attribute_type_color:
-                        if (colors == nullptr) { colors = attribute.data; }
+                        if (colors == nullptr)
+                        {
+                            colors = attribute.data;
+                        }
                         break;
                     case cgltf_attribute_type_texcoord:
-                        if (texcoords == nullptr) { texcoords = attribute.data; }
+                        if (texcoords == nullptr)
+                        {
+                            texcoords = attribute.data;
+                        }
                         break;
                     default:
                         break;
@@ -148,15 +154,15 @@ namespace
                 auto const base_vertex = static_cast<std::uint32_t>(result.vertices.size());
                 cgltf_size const vertex_count = positions->count;
 
-                for (cgltf_size i = 0; i < vertex_count; ++i)
+                for (cgltf_size vertex_idx = 0; vertex_idx < vertex_count; ++vertex_idx)
                 {
                     gltf_vertex vertex{};
 
-                    cgltf_accessor_read_float(positions, i, vertex.position, 3);
+                    cgltf_accessor_read_float(positions, vertex_idx, vertex.position, 3);
 
                     if (normals != nullptr)
                     {
-                        cgltf_accessor_read_float(normals, i, vertex.normal, 3);
+                        cgltf_accessor_read_float(normals, vertex_idx, vertex.normal, 3);
                     }
                     else
                     {
@@ -169,18 +175,22 @@ namespace
                     if (colors != nullptr)
                     {
                         cgltf_size const components = cgltf_num_components(colors->type);
-                        cgltf_accessor_read_float(colors, i, rgba, components);
-                        if (components < 4) { rgba[3] = 1.f; }
+                        cgltf_accessor_read_float(colors, vertex_idx, rgba, components);
+                        if (components < 4)
+                        {
+                            rgba[3] = 1.f;
+                        }
                     }
+
                     for (std::size_t k = 0; k < 4; ++k)
                     {
                         float const clamped = std::clamp(rgba[k], 0.f, 1.f);
-                        vertex.color[k] = static_cast<std::uint8_t>(clamped * 255.f + 0.5f);
+                        vertex.color[k] = static_cast<std::uint8_t>(std::lround(clamped * 255.f));
                     }
 
                     if (texcoords != nullptr)
                     {
-                        cgltf_accessor_read_float(texcoords, i, vertex.uv, 2);
+                        cgltf_accessor_read_float(texcoords, vertex_idx, vertex.uv, 2);
                     }
                     else
                     {
@@ -213,10 +223,9 @@ namespace
         if (data->materials_count > 0)
         {
             cgltf_material const& material = data->materials[0];
-            cgltf_texture const* base_color_texture =
-                material.has_pbr_metallic_roughness
-                    ? material.pbr_metallic_roughness.base_color_texture.texture
-                    : nullptr;
+            cgltf_texture const* base_color_texture = material.has_pbr_metallic_roughness
+                                                          ? material.pbr_metallic_roughness.base_color_texture.texture
+                                                          : nullptr;
 
             if (base_color_texture != nullptr
                 && base_color_texture->image != nullptr
@@ -231,6 +240,268 @@ namespace
 
         result.valid = !result.vertices.empty() && !result.indices.empty();
         return result;
+    }
+
+    // Records commands into a one-shot command buffer from `command_pool`, submits them on the
+    // main queue, and blocks until the GPU finishes.
+    [[nodiscard]]
+    bool submit_once(
+        vkgc::vulkan_context const& vk_context,
+        vkgc::vulkan_object_registry& vk_object_registry,
+        vkgc::vk_command_pool_handle const command_pool,
+        auto const& record_commands)
+    {
+        auto const one_time_command_buffers = vk_object_registry.allocate_command_buffers(command_pool, 1, true);
+        if (!VKGC_ENSURE(!one_time_command_buffers.empty()))
+        {
+            return false;
+        }
+
+        auto const command_buffer = one_time_command_buffers.front();
+
+        vkgc::scope_guard const free_command_buffer{
+            [&] { vk_object_registry.destroy_immediate(command_buffer); }
+        };
+
+        auto const command_buffer_handle = vk_object_registry.resolve_handle(command_buffer);
+        if (!VKGC_ENSURE_VKHANDLE(command_buffer_handle))
+        {
+            return false;
+        }
+
+        VkCommandBufferBeginInfo constexpr begin_info{
+            .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO},
+            .pNext{nullptr},
+            .flags{VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT},
+            .pInheritanceInfo{nullptr}
+        };
+
+        if (!VKGC_ENSURE_VKSUCCESS(vkBeginCommandBuffer(command_buffer_handle, &begin_info)))
+        {
+            return false;
+        }
+
+        record_commands(command_buffer_handle);
+
+        if (!VKGC_ENSURE_VKSUCCESS(vkEndCommandBuffer(command_buffer_handle)))
+        {
+            return false;
+        }
+
+        auto const submit_fence = vk_object_registry.create_fence(false, "one-shot submit fence");
+        if (!VKGC_ENSURE(submit_fence.is_valid()))
+        {
+            return false;
+        }
+
+        vkgc::scope_guard const free_fence{[&] { vk_object_registry.destroy_immediate(submit_fence); }};
+
+        auto const submit_fence_handle = vk_object_registry.resolve_handle(submit_fence);
+        if (!VKGC_ENSURE_VKHANDLE(submit_fence_handle))
+        {
+            return false;
+        }
+
+        VkCommandBufferSubmitInfo const command_buffer_submit_info{
+            .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
+            .pNext{nullptr},
+            .commandBuffer{command_buffer_handle},
+            .deviceMask{0}
+        };
+
+        VkSubmitInfo2 const submit_info{
+            .sType{VK_STRUCTURE_TYPE_SUBMIT_INFO_2},
+            .pNext{nullptr},
+            .flags{0},
+            .waitSemaphoreInfoCount{0},
+            .pWaitSemaphoreInfos{nullptr},
+            .commandBufferInfoCount{1},
+            .pCommandBufferInfos{&command_buffer_submit_info},
+            .signalSemaphoreInfoCount{0},
+            .pSignalSemaphoreInfos{nullptr}
+        };
+
+        if (!VKGC_ENSURE_VKSUCCESS(
+                vkQueueSubmit2(vk_context.device().main_queue(), 1, &submit_info, submit_fence_handle)))
+        {
+            return false;
+        }
+
+        if (!VKGC_ENSURE_VKSUCCESS(
+                vkWaitForFences(
+                    vk_context.device().handle(),
+                    1,
+                    &submit_fence_handle,
+                    VK_TRUE,
+                    std::numeric_limits<std::uint64_t>::max())))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    // Copies `bytes` into a persistently mapped staging buffer through its VMA mapping.
+    [[nodiscard]]
+    bool populate_staging(
+        vkgc::vulkan_context const& vk_context,
+        vkgc::vulkan_object_registry const& vk_object_registry,
+        vkgc::vk_buffer_handle const staging_buffer,
+        std::span<std::byte const> const bytes)
+    {
+        auto const allocation = vk_object_registry.bound_allocation(staging_buffer);
+        if (!VKGC_ENSURE(allocation.is_valid()))
+        {
+            return false;
+        }
+
+        auto const memory_property_flags = get_allocation_memory_properties(vk_context, vk_object_registry, allocation);
+        if (!VKGC_ENSUREF(
+                (memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0,
+                "non-host-coherent memory type requires explicit sync (flush)"))
+        {
+            return false;
+        }
+
+        auto const allocation_info = get_vma_allocation_info(vk_context, vk_object_registry, allocation);
+        if (!VKGC_ENSURE(allocation_info.allocationInfo.pMappedData != nullptr))
+        {
+            return false;
+        }
+
+        std::memcpy(allocation_info.allocationInfo.pMappedData, bytes.data(), bytes.size());
+
+        return true;
+    }
+
+    // Uploads `bytes` into `dst_buffer`: a direct host-mapped write when the destination
+    // memory allows it, otherwise a staging buffer and a one-shot GPU copy.
+    [[nodiscard]]
+    bool upload_buffer(
+        vkgc::vulkan_context const& vk_context,
+        vkgc::vulkan_object_registry& vk_object_registry,
+        vkgc::vk_command_pool_handle const command_pool,
+        vkgc::vk_buffer_handle const dst_buffer,
+        std::span<std::byte const> const bytes)
+    {
+        auto const allocation = vk_object_registry.bound_allocation(dst_buffer);
+        if (!VKGC_ENSURE(allocation.is_valid()))
+        {
+            return false;
+        }
+
+        auto const memory_property_flags = get_allocation_memory_properties(
+            vk_context,
+            vk_object_registry,
+            allocation);
+
+        VkMemoryPropertyFlags constexpr host_mappable_flags{
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
+
+        if ((memory_property_flags & host_mappable_flags) == host_mappable_flags)
+        {
+            auto const allocation_info = get_vma_allocation_info(vk_context, vk_object_registry, allocation);
+
+            void* mapped_ptr;
+            if (!VKGC_ENSURE_VKSUCCESS(
+                    vkMapMemory(
+                        vk_context.device().handle(),
+                        allocation_info.allocationInfo.deviceMemory,
+                        allocation_info.allocationInfo.offset,
+                        bytes.size(),
+                        0,
+                        &mapped_ptr)))
+            {
+                return false;
+            }
+
+            std::memcpy(mapped_ptr, bytes.data(), bytes.size());
+
+            vkUnmapMemory(vk_context.device().handle(), allocation_info.allocationInfo.deviceMemory);
+
+            return true;
+        }
+
+        // Non-mappable destination memory: route the data through a staging buffer and a
+        // one-shot transfer submission.
+        auto const staging_buffer = vkgc::create_staging_buffer(vk_object_registry, bytes.size());
+        if (!staging_buffer.is_valid())
+        {
+            return false;
+        }
+
+        vkgc::scope_guard const free_staging_buffer{[&] { vk_object_registry.destroy_immediate(staging_buffer); }};
+
+        if (!populate_staging(vk_context, vk_object_registry, staging_buffer, bytes))
+        {
+            return false;
+        }
+
+        auto const src_buffer_handle = vk_object_registry.resolve_handle(staging_buffer);
+        if (!VKGC_ENSURE_VKHANDLE(src_buffer_handle))
+        {
+            return false;
+        }
+
+        auto const dst_buffer_handle = vk_object_registry.resolve_handle(dst_buffer);
+        if (!VKGC_ENSURE_VKHANDLE(dst_buffer_handle))
+        {
+            return false;
+        }
+
+        auto const record_buffer_copy = [&](VkCommandBuffer command_buffer)
+        {
+            VkBufferCopy2 const copy_region{
+                .sType{VK_STRUCTURE_TYPE_BUFFER_COPY_2},
+                .pNext{nullptr},
+                .srcOffset{0},
+                .dstOffset{0},
+                .size{static_cast<VkDeviceSize>(bytes.size())}
+            };
+
+            VkCopyBufferInfo2 const copy_buffer_info{
+                .sType{VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2},
+                .pNext{nullptr},
+                .srcBuffer{src_buffer_handle},
+                .dstBuffer{dst_buffer_handle},
+                .regionCount{1},
+                .pRegions{&copy_region}
+            };
+
+            vkCmdCopyBuffer2(command_buffer, &copy_buffer_info);
+
+            // The fence wait only synchronizes with the host; vertex/index fetch in later
+            // submissions needs its own memory dependency on the copy.
+            VkBufferMemoryBarrier2 const to_vertex_input{
+                .sType{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2},
+                .pNext{nullptr},
+                .srcStageMask{VK_PIPELINE_STAGE_2_COPY_BIT},
+                .srcAccessMask{VK_ACCESS_2_TRANSFER_WRITE_BIT},
+                .dstStageMask{VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT | VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT},
+                .dstAccessMask{VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_2_INDEX_READ_BIT},
+                .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
+                .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
+                .buffer{dst_buffer_handle},
+                .offset{0},
+                .size{VK_WHOLE_SIZE}
+            };
+
+            VkDependencyInfo const dependency_info{
+                .sType{VK_STRUCTURE_TYPE_DEPENDENCY_INFO},
+                .pNext{nullptr},
+                .dependencyFlags{},
+                .memoryBarrierCount{0},
+                .pMemoryBarriers{nullptr},
+                .bufferMemoryBarrierCount{1},
+                .pBufferMemoryBarriers{&to_vertex_input},
+                .imageMemoryBarrierCount{0},
+                .pImageMemoryBarriers{nullptr},
+            };
+
+            vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+        };
+
+        return submit_once(vk_context, vk_object_registry, command_pool, record_buffer_copy);
     }
 }
 
@@ -291,8 +562,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return false;
     }
 
-    vkgc::vulkan_frame_ring frame_ring{vk_object_registry, vkgc::kFramesInFlight};
-
     auto const main_queue_command_pool = vk_object_registry.create_command_pool(
         VkCommandPoolCreateInfo{
             .sType{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO},
@@ -301,20 +570,20 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .queueFamilyIndex{vk_context.device().main_queue_family_index()}
         }
     );
-    if (!main_queue_command_pool.is_valid())
+    if (!VKGC_ENSURE(main_queue_command_pool.is_valid()))
     {
         return false;
     }
 
     auto const command_buffers =
         vk_object_registry.allocate_command_buffers(main_queue_command_pool, vkgc::kFramesInFlight, true);
-    if (command_buffers.empty())
+    if (!VKGC_ENSURE(!command_buffers.empty()))
     {
         return false;
     }
 
     VkFormat depth_attachment_format{VK_FORMAT_UNDEFINED};
-    for (auto preferred_depth_format : {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT})
+    for (auto preferred_depth_format : {VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}) // from renderer
     {
         VkFormatProperties2 fmt_properties{
             .sType{VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2},
@@ -400,8 +669,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return true;
     };
 
-    std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
-
     std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter03/gltf/chapter03_gltf.spv"};
     auto spirv_words = vkgc::load_binary_file<std::uint32_t>(path);
     if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
@@ -462,17 +729,15 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .primitiveRestartEnable{VK_FALSE}
     };
 
-    using vkgc::attribute_semantic;
-
     // Interleaved layout the glTF shader consumes: position + normal (float32x3), color
     // (unorm rgba8), texcoord (float32x2). Stride matches gltf_vertex (36 bytes).
     vkgc::vertex_layout const vertex_layout{
         .stride{static_cast<std::uint32_t>(sizeof(gltf_vertex))},
         .attributes{
-            {attribute_semantic::position, VK_FORMAT_R32G32B32_SFLOAT, 0u, 0u},
-            {attribute_semantic::normal, VK_FORMAT_R32G32B32_SFLOAT, 12u, 0u},
-            {attribute_semantic::color, VK_FORMAT_R8G8B8A8_UNORM, 24u, 0u},
-            {attribute_semantic::texcoord, VK_FORMAT_R32G32_SFLOAT, 28u, 0u}
+            {vkgc::attribute_semantic::position, VK_FORMAT_R32G32B32_SFLOAT, 0u, 0u},
+            {vkgc::attribute_semantic::normal, VK_FORMAT_R32G32B32_SFLOAT, 12u, 0u},
+            {vkgc::attribute_semantic::color, VK_FORMAT_R8G8B8A8_UNORM, 24u, 0u},
+            {vkgc::attribute_semantic::texcoord, VK_FORMAT_R32G32_SFLOAT, 28u, 0u}
         }
     };
 
@@ -538,66 +803,12 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return false;
     }
 
-    auto const upload_buffer = [&](vkgc::vk_buffer_handle const buffer, std::span<std::byte const> const bytes)
-    {
-        auto const allocation = vk_object_registry.bound_allocation(buffer);
-        if (!VKGC_ENSURE(allocation.is_valid()))
-        {
-            return false;
-        }
-
-        VkMemoryPropertyFlags memory_property_flags;
-        vmaGetAllocationMemoryProperties(
-            vk_context.device().vma_allocator(),
-            vk_object_registry.resolve_handle(allocation),
-            &memory_property_flags);
-
-        if (!VKGC_ENSUREF(
-                (memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0,
-                "non-host-coherent memory type requires explicit sync (flush)"))
-        {
-            return false;
-        }
-
-        if (!VKGC_ENSUREF(
-                (memory_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0,
-                "fallback scenario: memory [{:#06x}] is a non-mappable memory, use a staging buffer",
-                memory_property_flags))
-        {
-            return false;
-        }
-
-        VmaAllocationInfo2 allocation_info;
-        vmaGetAllocationInfo2(
-            vk_context.device().vma_allocator(),
-            vk_object_registry.resolve_handle(allocation),
-            &allocation_info);
-
-        void* mapped_ptr;
-        if (!VKGC_ENSURE_VKSUCCESS(
-                vkMapMemory(
-                    vk_context.device().handle(),
-                    allocation_info.allocationInfo.deviceMemory,
-                    allocation_info.allocationInfo.offset,
-                    bytes.size(),
-                    0,
-                    &mapped_ptr)))
-        {
-            return false;
-        }
-
-        std::memcpy(mapped_ptr, bytes.data(), bytes.size());
-
-        vkUnmapMemory(vk_context.device().handle(), allocation_info.allocationInfo.deviceMemory);
-        return true;
-    };
-
-    if (!upload_buffer(vertex_buffer, vertex_data))
+    if (!upload_buffer(vk_context, vk_object_registry, main_queue_command_pool, vertex_buffer, vertex_data))
     {
         return false;
     }
 
-    if (!upload_buffer(index_buffer, index_data))
+    if (!upload_buffer(vk_context, vk_object_registry, main_queue_command_pool, index_buffer, index_data))
     {
         return false;
     }
@@ -791,6 +1002,10 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     {
         return false;
     }
+
+    std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
+
+    vkgc::vulkan_frame_ring frame_ring{vk_object_registry, vkgc::kFramesInFlight};
 
     vkgc::update_loop([&]
     {
