@@ -37,6 +37,17 @@ export namespace vkgc
         vk_image_handle& image,
         vk_image_view_handle& image_view);
 
+    // Creates a device-local 2D texture (image + color-aspect view) the GPU can
+    // sample from and a transfer can write into. On success writes both handles
+    // and returns true; on failure destroys anything already created and returns false.
+    [[nodiscard]]
+    bool create_sampled_texture(
+        vulkan_object_registry& vk_object_registry,
+        VkFormat image_format,
+        VkExtent3D image_extent,
+        vk_image_handle& image,
+        vk_image_view_handle& image_view);
+
     // Creates a host-writable, device-local buffer of `size` bytes for the given
     // role, also usable as a transfer destination when the allocation ends up
     // non-mappable. Returns an invalid handle when `size` is zero.
@@ -54,13 +65,13 @@ export namespace vkgc
 
     [[nodiscard]]
     bool bind_image_memory(
-        vulkan_object_registry const& resources,
+        vulkan_object_registry const& vk_object_registry,
         vk_image_handle image,
         vk_allocation_handle memory);
 
     [[nodiscard]]
     bool bind_buffer_memory(
-        vulkan_object_registry const& resources,
+        vulkan_object_registry const& vk_object_registry,
         vk_buffer_handle buffer,
         vk_allocation_handle memory);
 

@@ -395,10 +395,7 @@ namespace
             vk_object_registry,
             allocation);
 
-        VkMemoryPropertyFlags constexpr host_mappable_flags{
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT};
-
-        if ((memory_property_flags & host_mappable_flags) == host_mappable_flags)
+        if ((memory_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0)
         {
             auto const allocation_info = get_vma_allocation_info(vk_context, vk_object_registry, allocation);
 
@@ -416,6 +413,19 @@ namespace
             }
 
             std::memcpy(mapped_ptr, bytes.data(), bytes.size());
+
+            if ((memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
+            {
+                VkMappedMemoryRange const mapped_range{
+                    VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+                    nullptr,
+                    allocation_info.allocationInfo.deviceMemory,
+                    allocation_info.allocationInfo.offset,
+                    bytes.size()
+                };
+
+                vkFlushMappedMemoryRanges(vk_context.device().handle(), 1, &mapped_range);
+            }
 
             vkUnmapMemory(vk_context.device().handle(), allocation_info.allocationInfo.deviceMemory);
 
@@ -755,25 +765,224 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         mesh.indices.size(),
         gltf_path.string());
 
-    // stb_image is wired this lesson but the GPU texture path is deferred: decode the base-color
-    // image CPU-side and report its dimensions so the loader is exercised end-to-end.
+    // Decode the base-color image CPU-side, move the pixels through a staging buffer into
+    // a device-local sampled image, and create the sampler that will read it (shader-side
+    // sampling is a later lesson).
+    vkgc::vk_image_handle base_color_texture_image;
+    vkgc::vk_image_view_handle base_color_texture_image_view;
+    vkgc::vk_sampler_handle base_color_texture_sampler;
+
     if (!mesh.base_color_texture_path.empty())
     {
         std::string const texture_path = mesh.base_color_texture_path.string();
+
         int texture_width{0};
         int texture_height{0};
         int texture_channels{0};
+
         stbi_uc* const pixels =
             stbi_load(texture_path.c_str(), &texture_width, &texture_height, &texture_channels, STBI_rgb_alpha);
         if (pixels != nullptr)
         {
+            vkgc::scope_guard const free_pixels{[&] { stbi_image_free(pixels); }};
+
             std::println(
                 "[stb] : decoded base-color texture [{}] : {}x{}, {} source channels",
                 texture_path,
                 texture_width,
                 texture_height,
                 texture_channels);
-            stbi_image_free(pixels);
+
+            VkExtent3D const texture_extent{
+                .width{static_cast<std::uint32_t>(texture_width)},
+                .height{static_cast<std::uint32_t>(texture_height)},
+                .depth{1}
+            };
+
+            if (!vkgc::create_sampled_texture(
+                    vk_object_registry,
+                    VK_FORMAT_R8G8B8A8_SRGB,
+                    texture_extent,
+                    base_color_texture_image,
+                    base_color_texture_image_view))
+            {
+                std::println(stderr, "[Vulkan] : Error : failed to create base-color texture");
+                return false;
+            }
+
+            base_color_texture_sampler = vk_object_registry.create_sampler(
+                VkSamplerCreateInfo{
+                    .sType{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO},
+                    .pNext{nullptr},
+                    .flags{0},
+                    .magFilter{VK_FILTER_LINEAR},
+                    .minFilter{VK_FILTER_LINEAR},
+                    .mipmapMode{VK_SAMPLER_MIPMAP_MODE_LINEAR},
+                    .addressModeU{VK_SAMPLER_ADDRESS_MODE_REPEAT},
+                    .addressModeV{VK_SAMPLER_ADDRESS_MODE_REPEAT},
+                    .addressModeW{VK_SAMPLER_ADDRESS_MODE_REPEAT},
+                    .mipLodBias{0.f},
+                    .anisotropyEnable{VK_FALSE},
+                    .maxAnisotropy{1.f},
+                    .compareEnable{VK_FALSE},
+                    .compareOp{VK_COMPARE_OP_NEVER},
+                    .minLod{0.f},
+                    .maxLod{VK_LOD_CLAMP_NONE},
+                    .borderColor{VK_BORDER_COLOR_INT_OPAQUE_BLACK},
+                    .unnormalizedCoordinates{VK_FALSE}
+                },
+                "gltf base-color sampler");
+
+            if (!VKGC_ENSURE(base_color_texture_sampler.is_valid()))
+            {
+                return false;
+            }
+
+            auto const texture_size_bytes =
+                static_cast<std::size_t>(texture_width) * static_cast<std::size_t>(texture_height) * 4u;
+            auto const texture_data = std::as_bytes(std::span{pixels, texture_size_bytes});
+
+            auto const staging_buffer = vkgc::create_staging_buffer(vk_object_registry, texture_data.size());
+            if (!staging_buffer.is_valid())
+            {
+                return false;
+            }
+
+            vkgc::scope_guard const free_staging_buffer{
+                [&] { vk_object_registry.destroy_immediate(staging_buffer); }
+            };
+
+            if (!populate_staging(vk_context, vk_object_registry, staging_buffer, texture_data))
+            {
+                return false;
+            }
+
+            auto const texture_image_handle = vk_object_registry.resolve_handle(base_color_texture_image);
+            if (!VKGC_ENSURE_VKHANDLE(texture_image_handle))
+            {
+                return false;
+            }
+
+            auto const staging_buffer_handle = vk_object_registry.resolve_handle(staging_buffer);
+            if (!VKGC_ENSURE_VKHANDLE(staging_buffer_handle))
+            {
+                return false;
+            }
+
+            auto const record_texture_upload = [&](VkCommandBuffer command_buffer)
+            {
+                {
+                    VkImageMemoryBarrier2 const to_transfer_dst{
+                        .sType{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2},
+                        .pNext{nullptr},
+                        .srcStageMask{VK_PIPELINE_STAGE_2_NONE},
+                        .srcAccessMask{VK_ACCESS_2_NONE},
+                        .dstStageMask{VK_PIPELINE_STAGE_2_COPY_BIT},
+                        .dstAccessMask{VK_ACCESS_2_TRANSFER_WRITE_BIT},
+                        .oldLayout{VK_IMAGE_LAYOUT_UNDEFINED},
+                        .newLayout{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
+                        .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
+                        .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
+                        .image{texture_image_handle},
+                        .subresourceRange{
+                            .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                            .baseMipLevel{0},
+                            .levelCount{1},
+                            .baseArrayLayer{0},
+                            .layerCount{1}
+                        }
+                    };
+
+                    VkDependencyInfo const dependency_info{
+                        .sType{VK_STRUCTURE_TYPE_DEPENDENCY_INFO},
+                        .pNext{nullptr},
+                        .dependencyFlags{},
+                        .memoryBarrierCount{0},
+                        .pMemoryBarriers{nullptr},
+                        .bufferMemoryBarrierCount{0},
+                        .pBufferMemoryBarriers{nullptr},
+                        .imageMemoryBarrierCount{1},
+                        .pImageMemoryBarriers{&to_transfer_dst},
+                    };
+
+                    vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+                }
+
+                VkBufferImageCopy2 const copy_region{
+                    .sType{VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2},
+                    .pNext{nullptr},
+                    .bufferOffset{0},
+                    .bufferRowLength{0},
+                    .bufferImageHeight{0},
+                    .imageSubresource{
+                        .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                        .mipLevel{0},
+                        .baseArrayLayer{0},
+                        .layerCount{1}
+                    },
+                    .imageOffset{.x{0}, .y{0}, .z{0}},
+                    .imageExtent{texture_extent}
+                };
+
+                VkCopyBufferToImageInfo2 const copy_buffer_to_image_info{
+                    .sType{VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2},
+                    .pNext{nullptr},
+                    .srcBuffer{staging_buffer_handle},
+                    .dstImage{texture_image_handle},
+                    .dstImageLayout{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
+                    .regionCount{1},
+                    .pRegions{&copy_region}
+                };
+
+                vkCmdCopyBufferToImage2(command_buffer, &copy_buffer_to_image_info);
+
+                {
+                    VkImageMemoryBarrier2 const to_shader_read{
+                        .sType{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2},
+                        .pNext{nullptr},
+                        .srcStageMask{VK_PIPELINE_STAGE_2_COPY_BIT},
+                        .srcAccessMask{VK_ACCESS_2_TRANSFER_WRITE_BIT},
+                        .dstStageMask{VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT},
+                        .dstAccessMask{VK_ACCESS_2_SHADER_SAMPLED_READ_BIT},
+                        .oldLayout{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
+                        .newLayout{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                        .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
+                        .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
+                        .image{texture_image_handle},
+                        .subresourceRange{
+                            .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                            .baseMipLevel{0},
+                            .levelCount{1},
+                            .baseArrayLayer{0},
+                            .layerCount{1}
+                        }
+                    };
+
+                    VkDependencyInfo const dependency_info{
+                        .sType{VK_STRUCTURE_TYPE_DEPENDENCY_INFO},
+                        .pNext{nullptr},
+                        .dependencyFlags{},
+                        .memoryBarrierCount{0},
+                        .pMemoryBarriers{nullptr},
+                        .bufferMemoryBarrierCount{0},
+                        .pBufferMemoryBarriers{nullptr},
+                        .imageMemoryBarrierCount{1},
+                        .pImageMemoryBarriers{&to_shader_read},
+                    };
+
+                    vkCmdPipelineBarrier2(command_buffer, &dependency_info);
+                }
+            };
+
+            bool const texture_uploaded = submit_once(
+                vk_context,
+                vk_object_registry,
+                main_queue_command_pool,
+                record_texture_upload);
+            if (!VKGC_ENSURE(texture_uploaded))
+            {
+                return false;
+            }
         }
         else
         {

@@ -22,7 +22,7 @@ import vkgc.scope_guard;
 namespace vkgc
 {
     vk_buffer_handle create_host_writable_buffer(
-        vulkan_object_registry& resources,
+        vulkan_object_registry& vk_object_registry,
         std::size_t const size,
         VkBufferUsageFlags const usage)
     {
@@ -47,16 +47,16 @@ namespace vkgc
                 VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
                 VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT
             },
-            .usage{VMA_MEMORY_USAGE_AUTO},
+            .usage{VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE},
             .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-            .preferredFlags{0},
+            .preferredFlags{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
             .memoryTypeBits{0},
             .pool{VK_NULL_HANDLE},
             .pUserData{nullptr},
             .priority{0}
         };
 
-        return resources.create_memory_bound_buffer(buffer_create_info, buffer_allocation_info);
+        return vk_object_registry.create_memory_bound_buffer(buffer_create_info, buffer_allocation_info);
     }
 
     vk_buffer_handle create_vertex_buffer(vulkan_object_registry& vk_object_registry, std::size_t const size)
@@ -98,9 +98,9 @@ namespace vkgc
                 VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
                 VMA_ALLOCATION_CREATE_MAPPED_BIT
             },
-            .usage{VMA_MEMORY_USAGE_AUTO},
-            .requiredFlags{0},
-            .preferredFlags{0},
+            .usage{VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE},
+            .requiredFlags{VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT},
+            .preferredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
             .memoryTypeBits{0},
             .pool{VK_NULL_HANDLE},
             .pUserData{nullptr},
@@ -240,25 +240,102 @@ namespace vkgc
         return true;
     }
 
+    bool create_sampled_texture(
+        vulkan_object_registry& vk_object_registry,
+        VkFormat const image_format,
+        VkExtent3D const image_extent,
+        vk_image_handle& image,
+        vk_image_view_handle& image_view)
+    {
+        VkImageCreateInfo const image_create_info{
+            .sType{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .imageType{VK_IMAGE_TYPE_2D},
+            .format{image_format},
+            .extent{image_extent},
+            .mipLevels{1},
+            .arrayLayers{1},
+            .samples{VK_SAMPLE_COUNT_1_BIT},
+            .tiling{VK_IMAGE_TILING_OPTIMAL},
+            .usage{VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT},
+            .sharingMode{VK_SHARING_MODE_EXCLUSIVE},
+            .queueFamilyIndexCount{0},
+            .pQueueFamilyIndices{nullptr},
+            .initialLayout{VK_IMAGE_LAYOUT_UNDEFINED}
+        };
+
+        VmaAllocationCreateInfo constexpr allocation_create_info{
+            .flags{0},
+            .usage{VMA_MEMORY_USAGE_AUTO},
+            .requiredFlags{VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+            .preferredFlags{0},
+            .memoryTypeBits{0},
+            .pool{VK_NULL_HANDLE},
+            .pUserData{nullptr},
+            .priority{0}
+        };
+
+        image = vk_object_registry.create_memory_bound_image(
+            image_create_info,
+            allocation_create_info,
+            "sampled texture image");
+        if (!image.is_valid())
+        {
+            return false;
+        }
+
+        VkImageViewCreateInfo const texture_view_create_info{
+            .sType{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{0},
+            .image{vk_object_registry.resolve_handle(image)},
+            .viewType{VK_IMAGE_VIEW_TYPE_2D},
+            .format{image_format},
+            .components{
+                .r{VK_COMPONENT_SWIZZLE_IDENTITY},
+                .g{VK_COMPONENT_SWIZZLE_IDENTITY},
+                .b{VK_COMPONENT_SWIZZLE_IDENTITY},
+                .a{VK_COMPONENT_SWIZZLE_IDENTITY}
+            },
+            .subresourceRange{
+                .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                .baseMipLevel{0},
+                .levelCount{1},
+                .baseArrayLayer{0},
+                .layerCount{1}
+            }
+        };
+
+        image_view = vk_object_registry.create_image_view(texture_view_create_info, "sampled texture image view");
+        if (!image_view.is_valid())
+        {
+            vk_object_registry.destroy_immediate(image);
+            return false;
+        }
+
+        return true;
+    }
+
     bool bind_image_memory(
-        vulkan_object_registry const& resources,
+        vulkan_object_registry const& vk_object_registry,
         vk_image_handle const image,
         vk_allocation_handle const memory)
     {
-        VkImage image_handle = resources.resolve_handle(image);
+        VkImage image_handle = vk_object_registry.resolve_handle(image);
         if (!VKGC_ENSURE_VKHANDLE(image_handle))
         {
             return false;
         }
 
-        VmaAllocation vma_allocation_handle = resources.resolve_handle(memory);
+        VmaAllocation vma_allocation_handle = vk_object_registry.resolve_handle(memory);
         if (!VKGC_ENSURE_VKHANDLE(vma_allocation_handle))
         {
             return false;
         }
 
         if (auto const result = vmaBindImageMemory(
-                resources.device().vma_allocator(),
+                vk_object_registry.device().vma_allocator(),
                 vma_allocation_handle,
                 image_handle);
             result != VK_SUCCESS)
@@ -271,24 +348,24 @@ namespace vkgc
     }
 
     bool bind_buffer_memory(
-        vulkan_object_registry const& resources,
+        vulkan_object_registry const& vk_object_registry,
         vk_buffer_handle const buffer,
         vk_allocation_handle const memory)
     {
-        VkBuffer buffer_handle = resources.resolve_handle(buffer);
+        VkBuffer buffer_handle = vk_object_registry.resolve_handle(buffer);
         if (!VKGC_ENSURE_VKHANDLE(buffer_handle))
         {
             return false;
         }
 
-        VmaAllocation vma_allocation_handle = resources.resolve_handle(memory);
+        VmaAllocation vma_allocation_handle = vk_object_registry.resolve_handle(memory);
         if (!VKGC_ENSURE_VKHANDLE(vma_allocation_handle))
         {
             return false;
         }
 
         if (auto const result = vmaBindBufferMemory(
-                resources.device().vma_allocator(),
+                vk_object_registry.device().vma_allocator(),
                 vma_allocation_handle,
                 buffer_handle);
             result != VK_SUCCESS)
