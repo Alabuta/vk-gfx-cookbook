@@ -41,14 +41,15 @@ namespace vkgc
         }
 
         // Destruction order: command_buffers -> command_pools -> pipelines ->
-        // pipeline_layouts -> pipeline_caches -> image_views -> images -> buffers ->
-        // allocations -> semaphores -> fences.
+        // pipeline_layouts -> pipeline_caches -> image_views -> samplers -> images ->
+        // buffers -> allocations -> semaphores -> fences.
         drain_pool_in_destructor<vk_object_tags::command_buffer>();
         drain_pool_in_destructor<vk_object_tags::command_pool>();
         drain_pool_in_destructor<vk_object_tags::pipeline>();
         drain_pool_in_destructor<vk_object_tags::pipeline_layout>();
         drain_pool_in_destructor<vk_object_tags::pipeline_cache>();
         drain_pool_in_destructor<vk_object_tags::image_view>();
+        drain_pool_in_destructor<vk_object_tags::sampler>();
         drain_pool_in_destructor<vk_object_tags::image>();
         drain_pool_in_destructor<vk_object_tags::buffer>();
         drain_pool_in_destructor<vk_object_tags::allocation>();
@@ -227,6 +228,21 @@ namespace vkgc
         device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE_VIEW, std::bit_cast<std::uint64_t>(handle), debug_name);
 
         return slot_map<vk_object_tags::image_view>().emplace(handle, info.format);
+    }
+
+    vk_sampler_handle vulkan_object_registry::create_sampler(VkSamplerCreateInfo const& info, char const* debug_name)
+    {
+        VkSampler handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreateSampler(device_.handle(), &info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create sampler ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(VK_OBJECT_TYPE_SAMPLER, std::bit_cast<std::uint64_t>(handle), debug_name);
+
+        return slot_map<vk_object_tags::sampler>().emplace(handle);
     }
 
     vk_fence_handle vulkan_object_registry::create_fence(bool const create_signaled, char const* debug_name)

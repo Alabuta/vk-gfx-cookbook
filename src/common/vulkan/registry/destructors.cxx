@@ -26,6 +26,11 @@ namespace vkgc
         vkDestroyImageView(device_.handle(), payload.handle, nullptr);
     }
 
+    void vulkan_object_registry::destroy_payload(sampler_payload const& payload) noexcept
+    {
+        vkDestroySampler(device_.handle(), payload.handle, nullptr);
+    }
+
     void vulkan_object_registry::destroy_payload(buffer_payload const& payload) noexcept
     {
         vkDestroyBuffer(device_.handle(), payload.handle, nullptr);

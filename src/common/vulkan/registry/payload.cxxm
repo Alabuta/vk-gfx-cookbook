@@ -29,6 +29,11 @@ export namespace vkgc
         VkFormat format{VK_FORMAT_UNDEFINED};
     };
 
+    struct sampler_payload
+    {
+        VkSampler handle{VK_NULL_HANDLE};
+    };
+
     struct buffer_payload
     {
         VkBuffer handle{VK_NULL_HANDLE};
@@ -103,6 +108,12 @@ export namespace vkgc
     struct vk_object_payload<vk_object_tags::image_view>
     {
         using type = image_view_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::sampler>
+    {
+        using type = sampler_payload;
     };
 
     template <>

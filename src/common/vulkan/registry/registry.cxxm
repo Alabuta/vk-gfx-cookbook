@@ -67,6 +67,9 @@ export namespace vkgc
         vk_image_view_handle create_image_view(VkImageViewCreateInfo const& info, char const* debug_name = "");
 
         [[nodiscard]]
+        vk_sampler_handle create_sampler(VkSamplerCreateInfo const& info, char const* debug_name = "");
+
+        [[nodiscard]]
         vk_fence_handle create_fence(bool create_signaled, char const* debug_name = "");
 
         [[nodiscard]]
@@ -169,6 +172,7 @@ export namespace vkgc
         using slot_map_tuple = std::tuple<
             vulkan_slot_map<vk_object_tags::image, image_payload>,
             vulkan_slot_map<vk_object_tags::image_view, image_view_payload>,
+            vulkan_slot_map<vk_object_tags::sampler, sampler_payload>,
             vulkan_slot_map<vk_object_tags::buffer, buffer_payload>,
             vulkan_slot_map<vk_object_tags::allocation, allocation_payload>,
             vulkan_slot_map<vk_object_tags::fence, fence_payload>,
@@ -209,6 +213,7 @@ export namespace vkgc
          */
         void destroy_payload(image_payload const& payload) noexcept;
         void destroy_payload(image_view_payload const& payload) noexcept;
+        void destroy_payload(sampler_payload const& payload) noexcept;
         void destroy_payload(buffer_payload const& payload) noexcept;
         void destroy_payload(allocation_payload const& payload) noexcept;
         void destroy_payload(fence_payload const& payload) noexcept;

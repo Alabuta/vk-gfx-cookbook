@@ -8,6 +8,7 @@ export namespace vkgc::vk_object_tags
 {
     struct image{};
     struct image_view{};
+    struct sampler{};
     struct buffer{};
     struct allocation{};
     struct fence{};
@@ -40,6 +41,7 @@ export namespace vkgc
 
     using vk_image_handle = vk_object_handle<vk_object_tags::image>;
     using vk_image_view_handle = vk_object_handle<vk_object_tags::image_view>;
+    using vk_sampler_handle = vk_object_handle<vk_object_tags::sampler>;
     using vk_buffer_handle = vk_object_handle<vk_object_tags::buffer>;
     using vk_allocation_handle = vk_object_handle<vk_object_tags::allocation>;
     using vk_fence_handle = vk_object_handle<vk_object_tags::fence>;
