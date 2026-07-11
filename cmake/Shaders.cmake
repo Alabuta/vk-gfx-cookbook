@@ -152,6 +152,10 @@ function(vkgc_compile_shaders TARGET_NAME)
                     -profile ${ARG_PROFILE}
                     -target ${ARG_TARGET}
                     -std 2026
+                    # 41012 reports the automatic profile widening that fragment-stage texture
+                    # sampling always triggers under a bare spirv_* profile; the escalation is the
+                    # desired behavior and does not change the emitted SPIR-V.
+                    -warnings-disable 41012
                     ${include_flags}
                     ${define_flags}
                     ${capability_flags}

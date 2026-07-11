@@ -8,6 +8,8 @@ vkgc_compile_shaders(chapter03_gltf
         spirv_1_5
     CAPABILITIES
         spirv_1_5
+        SPV_EXT_descriptor_indexing
+        GL_EXT_nonuniform_qualifier
     GLOB
         chapter03/gltf/*.slang
 )

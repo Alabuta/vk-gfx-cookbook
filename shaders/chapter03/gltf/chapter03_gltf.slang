@@ -9,6 +9,10 @@ struct PerFrameData {
 [[vk::push_constant]]
 PerFrameData per_frame;
 
+// Bindless array of combined image-samplers
+[[vk::binding(0, 0)]]
+Sampler2D kSamplers2D[] : register(t0);
+
 struct VSInput {
     float3 position;
     float3 normal;
@@ -23,6 +27,11 @@ struct v2p
     float4 color;
     float2 uv;
 };
+
+float4 textureBindless2D(uint texture_id, float2 uv)
+{
+    return kSamplers2D[NonUniformResourceIndex(texture_id)].Sample(uv);
+}
 
 [shader("vertex")]
 v2p main(VSInput input)
@@ -46,5 +55,6 @@ float4 main(v2p input) : SV_Target
     float ndotl = max(dot(normalize(input.normal), light_dir), 0.);
     float lighting = 0.2 + 0.8 * ndotl;
 
-    return float4(input.color.rgb * lighting, input.color.a);
+    float4 color = textureBindless2D(0, input.uv);
+    return float4(color.rgb * lighting, color.a);
 }

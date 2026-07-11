@@ -766,8 +766,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         gltf_path.string());
 
     // Decode the base-color image CPU-side, move the pixels through a staging buffer into
-    // a device-local sampled image, and create the sampler that will read it (shader-side
-    // sampling is a later lesson).
+    // a device-local sampled image, and create the sampler that will read it.
     vkgc::vk_image_handle base_color_texture_image;
     vkgc::vk_image_view_handle base_color_texture_image_view;
     vkgc::vk_sampler_handle base_color_texture_sampler;
@@ -1049,13 +1048,139 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .size{sizeof(per_frame_shader_data)}
     };
 
+    // Bindless combined image-sampler array the fragment shader indexes (binding 0, set 0).
+    // The layout only fixes the upper bound; update-after-bind + partially-bound +
+    // variable-count let the descriptor set carry however many textures actually load.
+    std::uint32_t constexpr max_bindless_samplers{64};
+
+    VkDescriptorSetLayoutBinding constexpr bindless_samplers_binding{
+        .binding{0},
+        .descriptorType{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        .descriptorCount{max_bindless_samplers},
+        .stageFlags{VK_SHADER_STAGE_FRAGMENT_BIT},
+        .pImmutableSamplers{nullptr}
+    };
+
+    VkDescriptorBindingFlags constexpr bindless_samplers_binding_flags{
+        VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
+        VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT |
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
+        VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+    };
+
+    VkDescriptorSetLayoutBindingFlagsCreateInfo const binding_flags_create_info{
+        .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO},
+        .pNext{nullptr},
+        .bindingCount{1},
+        .pBindingFlags{&bindless_samplers_binding_flags}
+    };
+
+    auto const descriptor_set_layout = vk_object_registry.create_descriptor_set_layout(
+        VkDescriptorSetLayoutCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO},
+            .pNext{&binding_flags_create_info},
+            .flags{VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT},
+            .bindingCount{1},
+            .pBindings{&bindless_samplers_binding}
+        },
+        "gltf bindless sampler set layout");
+    if (!VKGC_ENSURE(descriptor_set_layout.is_valid()))
+    {
+        return false;
+    }
+
+    auto const descriptor_set_layout_handle = vk_object_registry.resolve_handle(descriptor_set_layout);
+    if (!VKGC_ENSURE_VKHANDLE(descriptor_set_layout_handle))
+    {
+        return false;
+    }
+
+    VkDescriptorPoolSize constexpr bindless_samplers_pool_size{
+        .type{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+        .descriptorCount{max_bindless_samplers}
+    };
+
+    auto const descriptor_pool = vk_object_registry.create_descriptor_pool(
+        VkDescriptorPoolCreateInfo{
+            .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO},
+            .pNext{nullptr},
+            .flags{VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT},
+            .maxSets{1},
+            .poolSizeCount{1},
+            .pPoolSizes{&bindless_samplers_pool_size}
+        },
+        "gltf bindless descriptor pool");
+    if (!VKGC_ENSURE(descriptor_pool.is_valid()))
+    {
+        return false;
+    }
+
+    std::array const bindless_set_layouts{descriptor_set_layout};
+    std::array constexpr bindless_variable_counts{max_bindless_samplers};
+
+    auto const bindless_descriptor_sets = vk_object_registry.allocate_descriptor_sets(
+        descriptor_pool,
+        bindless_set_layouts,
+        bindless_variable_counts,
+        "gltf bindless descriptor set");
+    if (!VKGC_ENSURE(!bindless_descriptor_sets.empty()))
+    {
+        return false;
+    }
+
+    // The fragment shader indexes kSamplers2D[0]; write the duck's base color there. With no
+    // texture loaded the slot stays unwritten and sampling it is undefined (partially-bound
+    // only makes unwritten descriptors legal to *leave* unwritten, not to read).
+    if (base_color_texture_image_view.is_valid() && base_color_texture_sampler.is_valid())
+    {
+        auto const base_color_image_view_handle = vk_object_registry.resolve_handle(base_color_texture_image_view);
+        if (!VKGC_ENSURE_VKHANDLE(base_color_image_view_handle))
+        {
+            return false;
+        }
+
+        auto const base_color_sampler_handle = vk_object_registry.resolve_handle(base_color_texture_sampler);
+        if (!VKGC_ENSURE_VKHANDLE(base_color_sampler_handle))
+        {
+            return false;
+        }
+
+        auto const bindless_descriptor_set_handle =
+            vk_object_registry.resolve_handle(bindless_descriptor_sets.front());
+        if (!VKGC_ENSURE_VKHANDLE(bindless_descriptor_set_handle))
+        {
+            return false;
+        }
+
+        VkDescriptorImageInfo const base_color_image_info{
+            .sampler{base_color_sampler_handle},
+            .imageView{base_color_image_view_handle},
+            .imageLayout{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}
+        };
+
+        VkWriteDescriptorSet const bindless_sampler_write{
+            .sType{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
+            .pNext{nullptr},
+            .dstSet{bindless_descriptor_set_handle},
+            .dstBinding{0},
+            .dstArrayElement{0},
+            .descriptorCount{1},
+            .descriptorType{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
+            .pImageInfo{&base_color_image_info},
+            .pBufferInfo{nullptr},
+            .pTexelBufferView{nullptr}
+        };
+
+        vkUpdateDescriptorSets(vk_context.device().handle(), 1, &bindless_sampler_write, 0, nullptr);
+    }
+
     auto const pipeline_layout = vk_object_registry.create_pipeline_layout(
         VkPipelineLayoutCreateInfo{
             .sType{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO},
             .pNext{nullptr},
             .flags{0},
-            .setLayoutCount{0},
-            .pSetLayouts{nullptr},
+            .setLayoutCount{1},
+            .pSetLayouts{&descriptor_set_layout_handle},
             .pushConstantRangeCount{1},
             .pPushConstantRanges{&push_constant_range}
         },
@@ -1245,19 +1370,28 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return true;
         }
 
-        glm::mat4 constexpr view_point{glm::translate(glm::identity<glm::mat4>(), glm::vec3{0.f, 0.f, 2.f})};
-
         // Spin the mesh so all sides become visible over time.
         auto const time = static_cast<float>(glfwGetTime());
         glm::mat4 model = glm::rotate(
             glm::identity<glm::mat4>(),
+            glm::radians(-90.f),
+            glm::normalize(glm::vec3{1.f, 0.f, 0.f}));
+        model = glm::rotate(
+            model,
             time * glm::radians(45.f),
-            glm::normalize(glm::vec3{.5f, 1.f, 0.f}));
+            glm::normalize(glm::vec3{0.f, 0.f, 1.f}));
 
         auto const aspect = static_cast<float>(width) / static_cast<float>(height);
         auto proj = vkgc::math::rperspective(glm::radians(90.f), aspect, .01f, 1'000.f);
 
-        auto view = glm::inverse(view_point);
+        glm::mat4 constexpr view_point{glm::translate(glm::identity<glm::mat4>(), glm::vec3{0.f, 1.f, 2.f})};
+
+        auto const view = glm::inverse(view_point);
+
+        /*glm::mat4 const view{
+            glm::lookAt(glm::vec3{0.f, 1.f, 2.f}, glm::vec3{0.f, 0.f, 0.f}, glm::vec3{0.f, 1.f, 0.f})
+        };*/
+
         auto normal = glm::inverseTranspose(view * model);
 
         per_frame_shader_data const shader_data{
@@ -1487,6 +1621,23 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
 
         vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_handle);
+
+        auto const bindless_descriptor_set_handle =
+            vk_object_registry.resolve_handle(bindless_descriptor_sets.front());
+        if (!VKGC_ENSURE_VKHANDLE(bindless_descriptor_set_handle))
+        {
+            return false;
+        }
+
+        vkCmdBindDescriptorSets(
+            command_buffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            vk_object_registry.resolve_handle(pipeline_layout),
+            0,
+            1,
+            &bindless_descriptor_set_handle,
+            0,
+            nullptr);
 
         // Update shader data
         vkCmdPushConstants(
