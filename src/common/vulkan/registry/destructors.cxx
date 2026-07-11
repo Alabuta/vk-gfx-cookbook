@@ -70,6 +70,24 @@ namespace vkgc
         vkDestroyShaderEXT(device_.handle(), payload.handle, nullptr);
     }
 
+    void vulkan_object_registry::destroy_payload(descriptor_set_layout_payload const& payload) noexcept
+    {
+        vkDestroyDescriptorSetLayout(device_.handle(), payload.handle, nullptr);
+    }
+
+    void vulkan_object_registry::destroy_payload(descriptor_pool_payload const& payload) noexcept
+    {
+        vkDestroyDescriptorPool(device_.handle(), payload.handle, nullptr);
+    }
+
+    void vulkan_object_registry::destroy_payload(descriptor_set_payload const& payload) noexcept
+    {
+        if (payload.can_free)
+        {
+            vkFreeDescriptorSets(device_.handle(), payload.source_pool, 1, &payload.handle);
+        }
+    }
+
     void vulkan_object_registry::destroy_payload(pipeline_layout_payload const& payload) noexcept
     {
         vkDestroyPipelineLayout(device_.handle(), payload.handle, nullptr);

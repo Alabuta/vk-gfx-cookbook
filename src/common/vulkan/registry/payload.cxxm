@@ -77,6 +77,27 @@ export namespace vkgc
         VkShaderStageFlagBits stage{};
     };
 
+    struct descriptor_set_layout_payload
+    {
+        VkDescriptorSetLayout handle{VK_NULL_HANDLE};
+    };
+
+    struct descriptor_pool_payload
+    {
+        VkDescriptorPool handle{VK_NULL_HANDLE};
+        VkDescriptorPoolCreateFlags flags{0};
+    };
+
+    struct descriptor_set_payload
+    {
+        VkDescriptorSet handle{VK_NULL_HANDLE};
+        VkDescriptorPool source_pool{VK_NULL_HANDLE};
+        // Individual vkFreeDescriptorSets is only legal when the source pool was created
+        // with VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT; otherwise the set is
+        // reclaimed by the pool's own destruction/reset.
+        bool can_free{false};
+    };
+
     struct pipeline_layout_payload
     {
         VkPipelineLayout handle{VK_NULL_HANDLE};
@@ -162,6 +183,24 @@ export namespace vkgc
     struct vk_object_payload<vk_object_tags::shader>
     {
         using type = shader_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::descriptor_set_layout>
+    {
+        using type = descriptor_set_layout_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::descriptor_pool>
+    {
+        using type = descriptor_pool_payload;
+    };
+
+    template <>
+    struct vk_object_payload<vk_object_tags::descriptor_set>
+    {
+        using type = descriptor_set_payload;
     };
 
     template <>

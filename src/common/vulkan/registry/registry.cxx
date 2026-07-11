@@ -40,13 +40,13 @@ namespace vkgc
                 result);
         }
 
-        // Destruction order: command_buffers -> command_pools -> pipelines ->
-        // pipeline_layouts -> pipeline_caches -> image_views -> samplers -> images ->
-        // buffers -> allocations -> semaphores -> fences.
         drain_pool_in_destructor<vk_object_tags::command_buffer>();
         drain_pool_in_destructor<vk_object_tags::command_pool>();
         drain_pool_in_destructor<vk_object_tags::pipeline>();
         drain_pool_in_destructor<vk_object_tags::pipeline_layout>();
+        drain_pool_in_destructor<vk_object_tags::descriptor_set>();
+        drain_pool_in_destructor<vk_object_tags::descriptor_pool>();
+        drain_pool_in_destructor<vk_object_tags::descriptor_set_layout>();
         drain_pool_in_destructor<vk_object_tags::pipeline_cache>();
         drain_pool_in_destructor<vk_object_tags::image_view>();
         drain_pool_in_destructor<vk_object_tags::sampler>();
@@ -448,6 +448,124 @@ namespace vkgc
         }
 
         return shaders;
+    }
+
+    vk_descriptor_set_layout_handle vulkan_object_registry::create_descriptor_set_layout(
+        VkDescriptorSetLayoutCreateInfo const& info,
+        char const* debug_name)
+    {
+        VkDescriptorSetLayout handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreateDescriptorSetLayout(device_.handle(), &info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create descriptor set layout ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(
+            VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
+            std::bit_cast<std::uint64_t>(handle),
+            debug_name);
+
+        return slot_map<vk_object_tags::descriptor_set_layout>().emplace(handle);
+    }
+
+    vk_descriptor_pool_handle vulkan_object_registry::create_descriptor_pool(
+        VkDescriptorPoolCreateInfo const& info,
+        char const* debug_name)
+    {
+        VkDescriptorPool handle{VK_NULL_HANDLE};
+        if (auto const result = vkCreateDescriptorPool(device_.handle(), &info, nullptr, &handle);
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to create descriptor pool ({})", result);
+            return {};
+        }
+
+        device_.set_debug_object_name(
+            VK_OBJECT_TYPE_DESCRIPTOR_POOL,
+            std::bit_cast<std::uint64_t>(handle),
+            debug_name);
+
+        return slot_map<vk_object_tags::descriptor_pool>().emplace(handle, info.flags);
+    }
+
+    std::vector<vk_descriptor_set_handle> vulkan_object_registry::allocate_descriptor_sets(
+        vk_descriptor_pool_handle const pool,
+        std::span<vk_descriptor_set_layout_handle const> const layouts,
+        std::span<std::uint32_t const> const variable_descriptor_counts,
+        char const* debug_name)
+    {
+        VKGC_CHECKF(
+            variable_descriptor_counts.empty() || variable_descriptor_counts.size() == layouts.size(),
+            "variable descriptor counts must be empty or match the layout count");
+
+        if (!VKGC_ENSUREF(!layouts.empty(), "no descriptor set layouts provided"))
+        {
+            return {};
+        }
+
+        descriptor_pool_payload const* pool_payload = slot_map<vk_object_tags::descriptor_pool>().try_get(pool);
+        if (!VKGC_ENSUREF(pool_payload != nullptr, "stale descriptor pool handle"))
+        {
+            return {};
+        }
+
+        std::vector<VkDescriptorSetLayout> raw_layouts;
+        raw_layouts.reserve(layouts.size());
+
+        std::ranges::transform(
+            layouts,
+            std::back_inserter(raw_layouts),
+            [this](vk_descriptor_set_layout_handle const layout) { return resolve_handle(layout); });
+
+        if (!VKGC_ENSUREF(
+                !std::ranges::contains(raw_layouts, VkDescriptorSetLayout{VK_NULL_HANDLE}),
+                "stale descriptor set layout handle"))
+        {
+            return {};
+        }
+
+        VkDescriptorSetVariableDescriptorCountAllocateInfo const variable_count_info{
+            .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO},
+            .pNext{nullptr},
+            .descriptorSetCount{static_cast<std::uint32_t>(variable_descriptor_counts.size())},
+            .pDescriptorCounts{variable_descriptor_counts.data()}
+        };
+
+        VkDescriptorSetAllocateInfo const allocate_info{
+            .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO},
+            .pNext{variable_descriptor_counts.empty() ? nullptr : &variable_count_info},
+            .descriptorPool{pool_payload->handle},
+            .descriptorSetCount{static_cast<std::uint32_t>(raw_layouts.size())},
+            .pSetLayouts{raw_layouts.data()}
+        };
+
+        std::vector<VkDescriptorSet> raw_handles(raw_layouts.size(), VK_NULL_HANDLE);
+        if (auto const result = vkAllocateDescriptorSets(device_.handle(), &allocate_info, raw_handles.data());
+            result != VK_SUCCESS)
+        {
+            std::println(stderr, "[Vulkan] : Error : failed to allocate descriptor set(s) ({})", result);
+            return {};
+        }
+
+        VkDescriptorPool const pool_handle = pool_payload->handle;
+        bool const can_free = (pool_payload->flags & VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT) != 0;
+
+        std::vector<vk_descriptor_set_handle> handles;
+        handles.reserve(raw_handles.size());
+
+        for (VkDescriptorSet raw_handle : raw_handles)
+        {
+            device_.set_debug_object_name(
+                VK_OBJECT_TYPE_DESCRIPTOR_SET,
+                std::bit_cast<std::uint64_t>(raw_handle),
+                debug_name);
+
+            handles.push_back(slot_map<vk_object_tags::descriptor_set>().emplace(raw_handle, pool_handle, can_free));
+        }
+
+        return handles;
     }
 
     vk_pipeline_layout_handle vulkan_object_registry::create_pipeline_layout(
