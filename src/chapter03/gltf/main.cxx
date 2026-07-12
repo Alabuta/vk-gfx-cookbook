@@ -729,7 +729,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         }
     };
 
-    std::array shader_stages{*shader_vertex_stage.as_pointer(), *shader_fragment_stage.as_pointer()};
+    std::array const shader_stages{*shader_vertex_stage.as_pointer(), *shader_fragment_stage.as_pointer()};
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state{
         .sType{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO},
@@ -1036,14 +1036,13 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     struct per_frame_shader_data
     {
-        glm::mat4 mvp;
-        glm::mat4 model;
-        glm::mat4 view;
-        glm::mat4 normal;
+        glm::mat4 mvp{};
+        glm::mat4 normal{};
+        std::uint32_t texture_id{0};
     };
 
     VkPushConstantRange constexpr push_constant_range{
-        .stageFlags{VK_SHADER_STAGE_VERTEX_BIT},
+        .stageFlags{VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT},
         .offset{0},
         .size{sizeof(per_frame_shader_data)}
     };
@@ -1396,9 +1395,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         per_frame_shader_data const shader_data{
             .mvp{proj * view * model},
-            .model{model},
-            .view{view},
-            .normal{normal}
+            .normal{normal},
+            .texture_id{0}
         };
 
         std::uint32_t const frame_slot_index = frame_ring.begin_frame(frame_index);
@@ -1643,7 +1641,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         vkCmdPushConstants(
             command_buffer,
             vk_object_registry.resolve_handle(pipeline_layout),
-            VK_SHADER_STAGE_VERTEX_BIT,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             0,
             sizeof(shader_data),
             &shader_data);

@@ -1,13 +1,18 @@
 
 struct PerFrameData {
     float4x4 mvp;
-    float4x4 model;
-    float4x4 view;
     float4x4 normal;
+    uint texture_id;
 };
 
 [[vk::push_constant]]
 PerFrameData per_frame;
+
+// [[vk::binding(0, 0)]]
+// Texture2D kTextures2D[] : register(t0);
+
+// [[vk::binding(1, 0)]]
+// SamplerState kSamplers[] : register(s0);
 
 // Bindless array of combined image-samplers
 [[vk::binding(0, 0)]]
@@ -27,6 +32,11 @@ struct v2p
     float4 color;
     float2 uv;
 };
+
+// float4 textureBindless2D(uint texture_id, uint sampler_id, float2 uv)
+// {
+//     return kTextures2D[NonUniformResourceIndex(texture_id)].Sample(kSamplers[NonUniformResourceIndex(sampler_id)], uv);
+// }
 
 float4 textureBindless2D(uint texture_id, float2 uv)
 {
@@ -55,6 +65,6 @@ float4 main(v2p input) : SV_Target
     float ndotl = max(dot(normalize(input.normal), light_dir), 0.);
     float lighting = 0.2 + 0.8 * ndotl;
 
-    float4 color = textureBindless2D(0, input.uv);
+    float4 color = textureBindless2D(per_frame.texture_id, input.uv);
     return float4(color.rgb * lighting, color.a);
 }
