@@ -15,8 +15,7 @@
 #include "glslang/Include/glslang_c_interface.h"
 #include "glslang/Public/resource_limits_c.h"
 
-constexpr std::string_view kShaderDir = COOKBOOK_SHADER_DIR_STRING;
-constexpr std::string_view kCacheDir = COOKBOOK_CACHE_DIR_STRING;
+import vkgc.cookbook_paths;
 
 
 void compile_glsl_shader(
@@ -126,7 +125,7 @@ std::vector<char> read_text_file(std::string_view const file_name)
 {
     namespace fs = std::filesystem;
 
-    fs::path const path = fs::path{kShaderDir} / file_name;
+    fs::path const path = fs::path{vkgc::kShaderDir} / file_name;
     std::ifstream file{path, std::ios::in | std::ios::binary};
 
     if (file.fail())
@@ -167,7 +166,7 @@ void save_spirv_byte_code(std::string_view const file_name, std::span<std::byte 
 {
     namespace fs = std::filesystem;
 
-    fs::path const path = fs::path{kCacheDir} / file_name;
+    fs::path const path = fs::path{vkgc::kCacheDir} / file_name;
     std::ofstream file{path, std::ios::binary};
 
     if (file.fail())
@@ -208,9 +207,9 @@ int main()
     }
 
     namespace fs = std::filesystem;
-    if (std::error_code ec; !fs::create_directories(kCacheDir, ec) && ec)
+    if (std::error_code ec; !fs::create_directories(vkgc::kCacheDir, ec) && ec)
     {
-        std::println("Failed to create cache directory {}: {}", kCacheDir, ec.message());
+        std::println("Failed to create cache directory {}: {}", vkgc::kCacheDir, ec.message());
         glslang_finalize_process();
         return 1;
     }

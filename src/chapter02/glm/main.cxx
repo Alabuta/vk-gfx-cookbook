@@ -23,9 +23,8 @@
 #include "vulkan/format.hxx"
 #include "vulkan/assert.hxx"
 
-std::string_view constexpr kCacheDir{COOKBOOK_CACHE_DIR_STRING};
-
 import vkgc.bootstrap;
+import vkgc.cookbook_paths;
 import vkgc.file_io;
 import vkgc.window;
 import vkgc.vulkan_instance;
@@ -213,7 +212,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     std::uint32_t frame_index{vkgc::kFramesInFlight}; // renderer state
 
-    std::filesystem::path const path{std::filesystem::path{kCacheDir} / "chapter02/glm/chapter02_glm.spv"};
+    std::filesystem::path const path{std::filesystem::path{vkgc::kCacheDir} / "chapter02/glm/chapter02_glm.spv"};
     auto spirv_words = vkgc::load_binary_file<std::uint32_t>(path);
     if (!VKGC_ENSUREF(!spirv_words.empty(), "failed to load shader [{}]", path.string()))
     {
@@ -551,7 +550,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         .alphaToOneEnable{VK_FALSE}
     };
 
-    std::filesystem::path const pipeline_cache_path{std::filesystem::path{kCacheDir} / "chapter02_glm.pipeline"};
+    std::filesystem::path const pipeline_cache_path{std::filesystem::path{vkgc::kCacheDir} / "chapter02_glm.pipeline"};
 
     vkgc::vk_pipeline_cache_handle pipeline_cache;
     if (auto const cache_data = vkgc::load_binary_file<std::byte>(pipeline_cache_path); !cache_data.empty())

@@ -1,0 +1,14 @@
+module;
+
+#include <string_view>
+
+export module vkgc.cookbook_paths;
+
+export namespace vkgc
+{
+    // Values injected by the vkgc::config::cookbook_paths compile definitions (cmake/Interfaces.cmake).
+    std::string_view constexpr kShaderDir{COOKBOOK_SHADER_DIR_STRING};
+    std::string_view constexpr kCacheDir{COOKBOOK_CACHE_DIR_STRING};
+    std::string_view constexpr kAssetDir{COOKBOOK_ASSET_DIR_STRING};
+    std::string_view constexpr kLoaderSettingsFile{COOKBOOK_LOADER_SETTINGS_FILE_STRING};
+}

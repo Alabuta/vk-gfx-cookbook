@@ -110,6 +110,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
                     # app
                     ${COMMON_DIR}/app/bootstrap.cxxm
 
+                    # config
+                    ${COMMON_DIR}/config/cookbook_paths.cxxm
+
                     # io
                     ${COMMON_DIR}/io/file_io.cxxm
 
