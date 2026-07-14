@@ -12,7 +12,11 @@ import vkgc.vulkan_handle;
 
 export namespace vkgc
 {
-    struct image_payload
+    template <typename Handle>
+    struct vk_object_payload;
+
+    template <>
+    struct vk_object_payload<vk_image_handle>
     {
         VkImage handle{VK_NULL_HANDLE};
         VkFormat format{VK_FORMAT_UNDEFINED};
@@ -23,18 +27,21 @@ export namespace vkgc
         vk_allocation_handle allocation{};
     };
 
-    struct image_view_payload
+    template <>
+    struct vk_object_payload<vk_image_view_handle>
     {
         VkImageView handle{VK_NULL_HANDLE};
         VkFormat format{VK_FORMAT_UNDEFINED};
     };
 
-    struct sampler_payload
+    template <>
+    struct vk_object_payload<vk_sampler_handle>
     {
         VkSampler handle{VK_NULL_HANDLE};
     };
 
-    struct buffer_payload
+    template <>
+    struct vk_object_payload<vk_buffer_handle>
     {
         VkBuffer handle{VK_NULL_HANDLE};
         VkDeviceSize size{0};
@@ -43,52 +50,67 @@ export namespace vkgc
         vk_allocation_handle allocation{};
     };
 
-    struct allocation_payload
+    template <>
+    struct vk_object_payload<vk_allocation_handle>
     {
         VmaAllocation handle{VK_NULL_HANDLE};
     };
 
-    struct fence_payload
+    template <>
+    struct vk_object_payload<vk_fence_handle>
     {
         VkFence handle{VK_NULL_HANDLE};
     };
 
-    struct semaphore_payload
+    template <>
+    struct vk_object_payload<vk_bin_semaphore_handle>
     {
         VkSemaphore handle{VK_NULL_HANDLE};
     };
 
-    struct command_pool_payload
+    template <>
+    struct vk_object_payload<vk_timeline_semaphore_handle>
+    {
+        VkSemaphore handle{VK_NULL_HANDLE};
+    };
+
+    template <>
+    struct vk_object_payload<vk_command_pool_handle>
     {
         VkCommandPool handle{VK_NULL_HANDLE};
         std::uint32_t queue_family_index{std::numeric_limits<std::uint32_t>::max()};
     };
 
-    struct command_buffer_payload
+    template <>
+    struct vk_object_payload<vk_command_buffer_handle>
     {
         VkCommandBuffer handle{VK_NULL_HANDLE};
         VkCommandPool source_pool{VK_NULL_HANDLE};
         bool is_primary{false};
     };
 
-    struct shader_payload
+    template <>
+    struct vk_object_payload<vk_shader_handle>
     {
         VkShaderEXT handle{VK_NULL_HANDLE};
         VkShaderStageFlagBits stage{};
     };
 
-    struct descriptor_set_layout_payload
+    template <>
+    struct vk_object_payload<vk_descriptor_set_layout_handle>
     {
         VkDescriptorSetLayout handle{VK_NULL_HANDLE};
     };
 
-    struct descriptor_pool_payload
+    template <>
+    struct vk_object_payload<vk_descriptor_pool_handle>
     {
         VkDescriptorPool handle{VK_NULL_HANDLE};
         VkDescriptorPoolCreateFlags flags{0};
     };
 
-    struct descriptor_set_payload
+    template <>
+    struct vk_object_payload<vk_descriptor_set_handle>
     {
         VkDescriptorSet handle{VK_NULL_HANDLE};
         VkDescriptorPool source_pool{VK_NULL_HANDLE};
@@ -98,129 +120,21 @@ export namespace vkgc
         bool can_free{false};
     };
 
-    struct pipeline_layout_payload
+    template <>
+    struct vk_object_payload<vk_pipeline_layout_handle>
     {
         VkPipelineLayout handle{VK_NULL_HANDLE};
     };
 
-    struct pipeline_payload
+    template <>
+    struct vk_object_payload<vk_pipeline_handle>
     {
         VkPipeline handle{VK_NULL_HANDLE};
     };
 
-    struct pipeline_cache_payload
+    template <>
+    struct vk_object_payload<vk_pipeline_cache_handle>
     {
         VkPipelineCache handle{VK_NULL_HANDLE};
     };
-
-    /*
-     * Tag -> Payload mapping.
-     */
-    template <typename Tag>
-    struct vk_object_payload;
-
-    template <>
-    struct vk_object_payload<vk_object_tags::image>
-    {
-        using type = image_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::image_view>
-    {
-        using type = image_view_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::sampler>
-    {
-        using type = sampler_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::buffer>
-    {
-        using type = buffer_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::allocation>
-    {
-        using type = allocation_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::fence>
-    {
-        using type = fence_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::bin_semaphore>
-    {
-        using type = semaphore_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::timeline_semaphore>
-    {
-        using type = semaphore_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::command_pool>
-    {
-        using type = command_pool_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::command_buffer>
-    {
-        using type = command_buffer_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::shader>
-    {
-        using type = shader_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::descriptor_set_layout>
-    {
-        using type = descriptor_set_layout_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::descriptor_pool>
-    {
-        using type = descriptor_pool_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::descriptor_set>
-    {
-        using type = descriptor_set_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::pipeline_layout>
-    {
-        using type = pipeline_layout_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::pipeline>
-    {
-        using type = pipeline_payload;
-    };
-
-    template <>
-    struct vk_object_payload<vk_object_tags::pipeline_cache>
-    {
-        using type = pipeline_cache_payload;
-    };
-
-    template <typename Tag>
-    using vk_object_payload_t = vk_object_payload<Tag>::type;
 }

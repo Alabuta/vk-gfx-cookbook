@@ -4,33 +4,12 @@ module;
 
 export module vkgc.vulkan_handle;
 
-export namespace vkgc::vk_object_tags
-{
-    struct image{};
-    struct image_view{};
-    struct sampler{};
-    struct buffer{};
-    struct allocation{};
-    struct fence{};
-    struct bin_semaphore{};
-    struct timeline_semaphore{};
-    struct command_pool{};
-    struct command_buffer{};
-    struct shader{};
-    struct descriptor_set_layout{};
-    struct descriptor_pool{};
-    struct descriptor_set{};
-    struct pipeline_layout{};
-    struct pipeline{};
-    struct pipeline_cache{};
-}
-
 export namespace vkgc
 {
     template <typename T>
     struct vk_object_handle
     {
-        using TypeTag = T;
+        using tag = T;
 
         std::uint32_t index{0};
         std::uint32_t generation{0};
@@ -42,21 +21,21 @@ export namespace vkgc
         }
     };
 
-    using vk_image_handle = vk_object_handle<vk_object_tags::image>;
-    using vk_image_view_handle = vk_object_handle<vk_object_tags::image_view>;
-    using vk_sampler_handle = vk_object_handle<vk_object_tags::sampler>;
-    using vk_buffer_handle = vk_object_handle<vk_object_tags::buffer>;
-    using vk_allocation_handle = vk_object_handle<vk_object_tags::allocation>;
-    using vk_fence_handle = vk_object_handle<vk_object_tags::fence>;
-    using vk_bin_semaphore_handle = vk_object_handle<vk_object_tags::bin_semaphore>;
-    using vk_timeline_semaphore_handle = vk_object_handle<vk_object_tags::timeline_semaphore>;
-    using vk_command_pool_handle = vk_object_handle<vk_object_tags::command_pool>;
-    using vk_command_buffer_handle = vk_object_handle<vk_object_tags::command_buffer>;
-    using vk_shader_handle = vk_object_handle<vk_object_tags::shader>;
-    using vk_descriptor_set_layout_handle = vk_object_handle<vk_object_tags::descriptor_set_layout>;
-    using vk_descriptor_pool_handle = vk_object_handle<vk_object_tags::descriptor_pool>;
-    using vk_descriptor_set_handle = vk_object_handle<vk_object_tags::descriptor_set>;
-    using vk_pipeline_layout_handle = vk_object_handle<vk_object_tags::pipeline_layout>;
-    using vk_pipeline_handle = vk_object_handle<vk_object_tags::pipeline>;
-    using vk_pipeline_cache_handle = vk_object_handle<vk_object_tags::pipeline_cache>;
+    using vk_image_handle = vk_object_handle<struct vk_object_tag_image>;
+    using vk_image_view_handle = vk_object_handle<struct vk_object_tag_image_view>;
+    using vk_sampler_handle = vk_object_handle<struct vk_object_tag_sampler>;
+    using vk_buffer_handle = vk_object_handle<struct vk_object_tag_buffer>;
+    using vk_allocation_handle = vk_object_handle<struct vk_object_tag_allocation>;
+    using vk_fence_handle = vk_object_handle<struct vk_object_tag_fence>;
+    using vk_bin_semaphore_handle = vk_object_handle<struct vk_object_tag_bin_semaphore>;
+    using vk_timeline_semaphore_handle = vk_object_handle<struct vk_object_tag_timeline_semaphore>;
+    using vk_command_pool_handle = vk_object_handle<struct vk_object_tag_command_pool>;
+    using vk_command_buffer_handle = vk_object_handle<struct vk_object_tag_command_buffer>;
+    using vk_shader_handle = vk_object_handle<struct vk_object_tag_shader>;
+    using vk_descriptor_set_layout_handle = vk_object_handle<struct vk_object_tag_descriptor_set_layout>;
+    using vk_descriptor_pool_handle = vk_object_handle<struct vk_object_tag_descriptor_pool>;
+    using vk_descriptor_set_handle = vk_object_handle<struct vk_object_tag_descriptor_set>;
+    using vk_pipeline_layout_handle = vk_object_handle<struct vk_object_tag_pipeline_layout>;
+    using vk_pipeline_handle = vk_object_handle<struct vk_object_tag_pipeline>;
+    using vk_pipeline_cache_handle = vk_object_handle<struct vk_object_tag_pipeline_cache>;
 }

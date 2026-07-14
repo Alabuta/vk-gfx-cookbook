@@ -40,23 +40,23 @@ namespace vkgc
                 result);
         }
 
-        drain_pool_in_destructor<vk_object_tags::command_buffer>();
-        drain_pool_in_destructor<vk_object_tags::command_pool>();
-        drain_pool_in_destructor<vk_object_tags::pipeline>();
-        drain_pool_in_destructor<vk_object_tags::pipeline_layout>();
-        drain_pool_in_destructor<vk_object_tags::descriptor_set>();
-        drain_pool_in_destructor<vk_object_tags::descriptor_pool>();
-        drain_pool_in_destructor<vk_object_tags::descriptor_set_layout>();
-        drain_pool_in_destructor<vk_object_tags::pipeline_cache>();
-        drain_pool_in_destructor<vk_object_tags::image_view>();
-        drain_pool_in_destructor<vk_object_tags::sampler>();
-        drain_pool_in_destructor<vk_object_tags::image>();
-        drain_pool_in_destructor<vk_object_tags::buffer>();
-        drain_pool_in_destructor<vk_object_tags::allocation>();
-        drain_pool_in_destructor<vk_object_tags::bin_semaphore>();
-        drain_pool_in_destructor<vk_object_tags::timeline_semaphore>();
-        drain_pool_in_destructor<vk_object_tags::fence>();
-        drain_pool_in_destructor<vk_object_tags::shader>();
+        drain_pool_in_destructor<vk_command_buffer_handle>();
+        drain_pool_in_destructor<vk_command_pool_handle>();
+        drain_pool_in_destructor<vk_pipeline_handle>();
+        drain_pool_in_destructor<vk_pipeline_layout_handle>();
+        drain_pool_in_destructor<vk_descriptor_set_handle>();
+        drain_pool_in_destructor<vk_descriptor_pool_handle>();
+        drain_pool_in_destructor<vk_descriptor_set_layout_handle>();
+        drain_pool_in_destructor<vk_pipeline_cache_handle>();
+        drain_pool_in_destructor<vk_image_view_handle>();
+        drain_pool_in_destructor<vk_sampler_handle>();
+        drain_pool_in_destructor<vk_image_handle>();
+        drain_pool_in_destructor<vk_buffer_handle>();
+        drain_pool_in_destructor<vk_allocation_handle>();
+        drain_pool_in_destructor<vk_bin_semaphore_handle>();
+        drain_pool_in_destructor<vk_timeline_semaphore_handle>();
+        drain_pool_in_destructor<vk_fence_handle>();
+        drain_pool_in_destructor<vk_shader_handle>();
     }
 
     vk_image_handle vulkan_object_registry::create_image(VkImageCreateInfo const& info, char const* debug_name)
@@ -71,7 +71,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::image>().emplace(
+        return slot_map<vk_image_handle>().emplace(
             handle,
             info.format,
             info.extent,
@@ -104,8 +104,8 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE, std::bit_cast<std::uint64_t>(image), debug_name);
 
-        auto allocation_handle = slot_map<vk_object_tags::allocation>().emplace(allocation);
-        return slot_map<vk_object_tags::image>().emplace(
+        auto allocation_handle = slot_map<vk_allocation_handle>().emplace(allocation);
+        return slot_map<vk_image_handle>().emplace(
             image,
             image_info.format,
             image_info.extent,
@@ -138,7 +138,7 @@ namespace vkgc
             return {};
         }
 
-        return slot_map<vk_object_tags::allocation>().emplace(allocation);
+        return slot_map<vk_allocation_handle>().emplace(allocation);
     }
 
     vk_buffer_handle vulkan_object_registry::create_buffer(VkBufferCreateInfo const& info, char const* debug_name)
@@ -153,7 +153,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_BUFFER, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::buffer>().emplace(handle, info.size, info.usage, vk_allocation_handle{});
+        return slot_map<vk_buffer_handle>().emplace(handle, info.size, info.usage, vk_allocation_handle{});
     }
 
     vk_buffer_handle vulkan_object_registry::create_memory_bound_buffer(
@@ -179,8 +179,8 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_BUFFER, std::bit_cast<std::uint64_t>(buffer), debug_name);
 
-        auto allocation_handle = slot_map<vk_object_tags::allocation>().emplace(allocation);
-        return slot_map<vk_object_tags::buffer>().emplace(
+        auto allocation_handle = slot_map<vk_allocation_handle>().emplace(allocation);
+        return slot_map<vk_buffer_handle>().emplace(
             buffer,
             buffer_info.size,
             buffer_info.usage,
@@ -210,7 +210,7 @@ namespace vkgc
             return {};
         }
 
-        return slot_map<vk_object_tags::allocation>().emplace(allocation);
+        return slot_map<vk_allocation_handle>().emplace(allocation);
     }
 
     vk_image_view_handle vulkan_object_registry::create_image_view(
@@ -227,7 +227,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_IMAGE_VIEW, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::image_view>().emplace(handle, info.format);
+        return slot_map<vk_image_view_handle>().emplace(handle, info.format);
     }
 
     vk_sampler_handle vulkan_object_registry::create_sampler(VkSamplerCreateInfo const& info, char const* debug_name)
@@ -242,7 +242,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_SAMPLER, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::sampler>().emplace(handle);
+        return slot_map<vk_sampler_handle>().emplace(handle);
     }
 
     vk_fence_handle vulkan_object_registry::create_fence(bool const create_signaled, char const* debug_name)
@@ -264,7 +264,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_FENCE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::fence>().emplace(handle);
+        return slot_map<vk_fence_handle>().emplace(handle);
     }
 
     vk_bin_semaphore_handle vulkan_object_registry::create_binary_semaphore(char const* debug_name)
@@ -292,7 +292,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::bin_semaphore>().emplace(handle);
+        return slot_map<vk_bin_semaphore_handle>().emplace(handle);
     }
 
     vk_timeline_semaphore_handle vulkan_object_registry::create_timeline_semaphore(
@@ -322,7 +322,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::timeline_semaphore>().emplace(handle);
+        return slot_map<vk_timeline_semaphore_handle>().emplace(handle);
 
     }
 
@@ -340,7 +340,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_COMMAND_POOL, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::command_pool>().emplace(handle, info.queueFamilyIndex);
+        return slot_map<vk_command_pool_handle>().emplace(handle, info.queueFamilyIndex);
     }
 
     std::vector<vk_command_buffer_handle> vulkan_object_registry::allocate_command_buffers(
@@ -373,7 +373,7 @@ namespace vkgc
         std::vector<vk_command_buffer_handle> handles;
         handles.reserve(count);
 
-        auto&& vulkan_slot_map = slot_map<vk_object_tags::command_buffer>();
+        auto&& vulkan_slot_map = slot_map<vk_command_buffer_handle>();
 
         std::ranges::transform(
             raw_handles,
@@ -440,7 +440,7 @@ namespace vkgc
 
         for (auto [handle, info] : std::views::zip(shader_handles, infos))
         {
-            shaders.push_back(slot_map<vk_object_tags::shader>().emplace(handle, info.stage));
+            shaders.push_back(slot_map<vk_shader_handle>().emplace(handle, info.stage));
             device_.set_debug_object_name(
                 VK_OBJECT_TYPE_SHADER_EXT,
                 std::bit_cast<std::uint64_t>(handle),
@@ -467,7 +467,7 @@ namespace vkgc
             std::bit_cast<std::uint64_t>(handle),
             debug_name);
 
-        return slot_map<vk_object_tags::descriptor_set_layout>().emplace(handle);
+        return slot_map<vk_descriptor_set_layout_handle>().emplace(handle);
     }
 
     vk_descriptor_pool_handle vulkan_object_registry::create_descriptor_pool(
@@ -487,7 +487,7 @@ namespace vkgc
             std::bit_cast<std::uint64_t>(handle),
             debug_name);
 
-        return slot_map<vk_object_tags::descriptor_pool>().emplace(handle, info.flags);
+        return slot_map<vk_descriptor_pool_handle>().emplace(handle, info.flags);
     }
 
     std::vector<vk_descriptor_set_handle> vulkan_object_registry::allocate_descriptor_sets(
@@ -505,7 +505,7 @@ namespace vkgc
             return {};
         }
 
-        descriptor_pool_payload const* pool_payload = slot_map<vk_object_tags::descriptor_pool>().try_get(pool);
+        vk_object_payload<vk_descriptor_pool_handle> const* pool_payload = slot_map<vk_descriptor_pool_handle>().try_get(pool);
         if (!VKGC_ENSUREF(pool_payload != nullptr, "stale descriptor pool handle"))
         {
             return {};
@@ -562,7 +562,7 @@ namespace vkgc
                 std::bit_cast<std::uint64_t>(raw_handle),
                 debug_name);
 
-            handles.push_back(slot_map<vk_object_tags::descriptor_set>().emplace(raw_handle, pool_handle, can_free));
+            handles.push_back(slot_map<vk_descriptor_set_handle>().emplace(raw_handle, pool_handle, can_free));
         }
 
         return handles;
@@ -582,7 +582,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_LAYOUT, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::pipeline_layout>().emplace(handle);
+        return slot_map<vk_pipeline_layout_handle>().emplace(handle);
     }
 
     vk_pipeline_cache_handle vulkan_object_registry::create_pipeline_cache_from_data(
@@ -612,7 +612,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_CACHE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::pipeline_cache>().emplace(handle);
+        return slot_map<vk_pipeline_cache_handle>().emplace(handle);
     }
 
     vk_pipeline_cache_handle vulkan_object_registry::create_pipeline_cache_empty(char const* debug_name)
@@ -635,7 +635,7 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_CACHE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::pipeline_cache>().emplace(handle);
+        return slot_map<vk_pipeline_cache_handle>().emplace(handle);
     }
 
     vk_pipeline_handle vulkan_object_registry::create_graphics_pipeline(
@@ -659,30 +659,30 @@ namespace vkgc
 
         device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE, std::bit_cast<std::uint64_t>(handle), debug_name);
 
-        return slot_map<vk_object_tags::pipeline>().emplace(handle);
+        return slot_map<vk_pipeline_handle>().emplace(handle);
     }
 
     VkFormat vulkan_object_registry::image_format(vk_image_handle handle) const noexcept
     {
-        image_payload const* p = slot_map<vk_object_tags::image>().try_get(handle);
+        vk_object_payload<vk_image_handle> const* p = slot_map<vk_image_handle>().try_get(handle);
         return p != nullptr ? p->format : VK_FORMAT_UNDEFINED;
     }
 
     VkExtent3D vulkan_object_registry::image_extent(vk_image_handle handle) const noexcept
     {
-        image_payload const* p = slot_map<vk_object_tags::image>().try_get(handle);
+        vk_object_payload<vk_image_handle> const* p = slot_map<vk_image_handle>().try_get(handle);
         return p != nullptr ? p->extent : VkExtent3D{};
     }
 
     VkDeviceSize vulkan_object_registry::buffer_size(vk_buffer_handle handle) const noexcept
     {
-        buffer_payload const* p = slot_map<vk_object_tags::buffer>().try_get(handle);
+        vk_object_payload<vk_buffer_handle> const* p = slot_map<vk_buffer_handle>().try_get(handle);
         return p != nullptr ? p->size : VkDeviceSize{0};
     }
 
     vk_allocation_handle vulkan_object_registry::bound_allocation(vk_buffer_handle handle) const noexcept
     {
-        buffer_payload const* p = slot_map<vk_object_tags::buffer>().try_get(handle);
+        vk_object_payload<vk_buffer_handle> const* p = slot_map<vk_buffer_handle>().try_get(handle);
         return p != nullptr ? p->allocation : vk_allocation_handle{};
     }
 

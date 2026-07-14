@@ -131,7 +131,7 @@ namespace vkgc
 
         [this, &queue]<std::size_t... I>(std::index_sequence<I...>)
         {
-            ((drain_one<typename std::tuple_element_t<I, T>::value_type::TypeTag>(queue)), ...);
+            ((drain_one<typename std::tuple_element_t<I, T>::value_type>(queue)), ...);
         }(std::make_index_sequence<std::tuple_size_v<T>>{});
     }
 }

@@ -44,10 +44,10 @@ export namespace vkgc
         // The actual destroy() runs the next time begin_frame() rotates
         // back to this slot (i.e. after the timeline semaphore reaches the
         // value signaled by the frame that used the slot).
-        template <typename Tag>
-        void defer_destroy(vk_object_handle<Tag> const handle)
+        template <typename Handle>
+        void defer_destroy(Handle const handle)
         {
-            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(pending_queue_slots_[frame_slot_index_].buckets);
+            auto& bucket = std::get<std::vector<Handle>>(pending_queue_slots_[frame_slot_index_].buckets);
             bucket.push_back(handle);
         }
 
@@ -84,10 +84,10 @@ export namespace vkgc
 
         void drain_slot(std::uint32_t slot_index);
 
-        template <typename Tag>
+        template <typename Handle>
         void drain_one(pending_queue& queue)
         {
-            auto& bucket = std::get<std::vector<vk_object_handle<Tag>>>(queue.buckets);
+            auto& bucket = std::get<std::vector<Handle>>(queue.buckets);
             for (auto const handle : bucket)
             {
                 object_registry_.destroy_immediate(handle);

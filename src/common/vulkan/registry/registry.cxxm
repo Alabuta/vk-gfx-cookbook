@@ -135,37 +135,37 @@ export namespace vkgc
             char const* debug_name = "");
 
         // Resolve the underlying Vulkan object from a handle. Returns VK_NULL_HANDLE-of-T for stale handles.
-        template <typename Tag>
+        template <typename Handle>
         [[nodiscard]]
-        auto resolve_handle(vk_object_handle<Tag> const handle) const noexcept
+        auto resolve_handle(Handle const handle) const noexcept
         {
-            using payload_type = vk_object_payload_t<Tag>;
+            using payload_type = vk_object_payload<Handle>;
             using vk_type = decltype(payload_type{}.handle);
 
-            payload_type const* p = slot_map<Tag>().try_get(handle);
+            payload_type const* p = slot_map<Handle>().try_get(handle);
             return p != nullptr ? p->handle : vk_type{VK_NULL_HANDLE};
         }
 
         // Caller ensures no GPU work references the resource.
         // The frame ring is responsible for deferring the call until that's guaranteed.
-        template <typename Tag>
-        void destroy_immediate(vk_object_handle<Tag> const handle)
+        template <typename Handle>
+        void destroy_immediate(Handle const handle)
         {
-            auto& slots = slot_map<Tag>();
+            auto& slots = slot_map<Handle>();
             if (!slots.is_alive(handle))
             {
                 return;
             }
 
-            vk_object_payload_t<Tag> payload = slots.release(handle);
+            vk_object_payload<Handle> payload = slots.release(handle);
             destroy_payload(std::move(payload));
         }
 
-        template <typename Tag>
+        template <typename Handle>
         [[nodiscard]]
-        bool is_alive(vk_object_handle<Tag> const handle) const noexcept
+        bool is_alive(Handle const handle) const noexcept
         {
-            return slot_map<Tag>().is_alive(handle);
+            return slot_map<Handle>().is_alive(handle);
         }
 
         [[nodiscard]]
@@ -191,41 +191,41 @@ export namespace vkgc
     private:
 
         using slot_map_tuple = std::tuple<
-            vulkan_slot_map<vk_object_tags::image, image_payload>,
-            vulkan_slot_map<vk_object_tags::image_view, image_view_payload>,
-            vulkan_slot_map<vk_object_tags::sampler, sampler_payload>,
-            vulkan_slot_map<vk_object_tags::buffer, buffer_payload>,
-            vulkan_slot_map<vk_object_tags::allocation, allocation_payload>,
-            vulkan_slot_map<vk_object_tags::fence, fence_payload>,
-            vulkan_slot_map<vk_object_tags::bin_semaphore, semaphore_payload>,
-            vulkan_slot_map<vk_object_tags::timeline_semaphore, semaphore_payload>,
-            vulkan_slot_map<vk_object_tags::command_pool, command_pool_payload>,
-            vulkan_slot_map<vk_object_tags::command_buffer, command_buffer_payload>,
-            vulkan_slot_map<vk_object_tags::shader, shader_payload>,
-            vulkan_slot_map<vk_object_tags::descriptor_set_layout, descriptor_set_layout_payload>,
-            vulkan_slot_map<vk_object_tags::descriptor_pool, descriptor_pool_payload>,
-            vulkan_slot_map<vk_object_tags::descriptor_set, descriptor_set_payload>,
-            vulkan_slot_map<vk_object_tags::pipeline_layout, pipeline_layout_payload>,
-            vulkan_slot_map<vk_object_tags::pipeline, pipeline_payload>,
-            vulkan_slot_map<vk_object_tags::pipeline_cache, pipeline_cache_payload>
+            vulkan_slot_map<vk_image_handle, vk_object_payload<vk_image_handle>>,
+            vulkan_slot_map<vk_image_view_handle, vk_object_payload<vk_image_view_handle>>,
+            vulkan_slot_map<vk_sampler_handle, vk_object_payload<vk_sampler_handle>>,
+            vulkan_slot_map<vk_buffer_handle, vk_object_payload<vk_buffer_handle>>,
+            vulkan_slot_map<vk_allocation_handle, vk_object_payload<vk_allocation_handle>>,
+            vulkan_slot_map<vk_fence_handle, vk_object_payload<vk_fence_handle>>,
+            vulkan_slot_map<vk_bin_semaphore_handle, vk_object_payload<vk_bin_semaphore_handle>>,
+            vulkan_slot_map<vk_timeline_semaphore_handle, vk_object_payload<vk_timeline_semaphore_handle>>,
+            vulkan_slot_map<vk_command_pool_handle, vk_object_payload<vk_command_pool_handle>>,
+            vulkan_slot_map<vk_command_buffer_handle, vk_object_payload<vk_command_buffer_handle>>,
+            vulkan_slot_map<vk_shader_handle, vk_object_payload<vk_shader_handle>>,
+            vulkan_slot_map<vk_descriptor_set_layout_handle, vk_object_payload<vk_descriptor_set_layout_handle>>,
+            vulkan_slot_map<vk_descriptor_pool_handle, vk_object_payload<vk_descriptor_pool_handle>>,
+            vulkan_slot_map<vk_descriptor_set_handle, vk_object_payload<vk_descriptor_set_handle>>,
+            vulkan_slot_map<vk_pipeline_layout_handle, vk_object_payload<vk_pipeline_layout_handle>>,
+            vulkan_slot_map<vk_pipeline_handle, vk_object_payload<vk_pipeline_handle>>,
+            vulkan_slot_map<vk_pipeline_cache_handle, vk_object_payload<vk_pipeline_cache_handle>>
         >;
 
         vulkan_device const& device_;
         slot_map_tuple slot_maps_;
 
-        template <typename Tag, typename S>
+        template <typename Handle, typename S>
         auto slot_map(this S&& self) noexcept
             -> std::conditional_t<
                 std::is_const_v<std::remove_reference_t<S>>,
-                vulkan_slot_map<Tag, vk_object_payload_t<Tag>> const&, vulkan_slot_map<Tag, vk_object_payload_t<Tag>>&>
+                vulkan_slot_map<Handle, vk_object_payload<Handle>> const&, vulkan_slot_map<Handle, vk_object_payload<Handle>>&>
         {
-            return std::get<vulkan_slot_map<Tag, vk_object_payload_t<Tag>>>(self.slot_maps_);
+            return std::get<vulkan_slot_map<Handle, vk_object_payload<Handle>>>(self.slot_maps_);
         }
 
-        template <typename Tag>
+        template <typename Handle>
         void drain_pool_in_destructor()
         {
-            slot_map<Tag>().for_each_live([this](auto, vk_object_payload_t<Tag> const& payload)
+            slot_map<Handle>().for_each_live([this](auto, vk_object_payload<Handle> const& payload)
             {
                 destroy_payload(payload);
             });
@@ -233,23 +233,24 @@ export namespace vkgc
 
         /*
          * Per-payload destruction. One free function per payload type;
-         * vulkan_object_registry::destroy<Tag> dispatches to the matching overload via the payload type.
+         * vulkan_object_registry::destroy<Handle> dispatches to the matching overload via the payload type.
          */
-        void destroy_payload(image_payload const& payload) noexcept;
-        void destroy_payload(image_view_payload const& payload) noexcept;
-        void destroy_payload(sampler_payload const& payload) noexcept;
-        void destroy_payload(buffer_payload const& payload) noexcept;
-        void destroy_payload(allocation_payload const& payload) noexcept;
-        void destroy_payload(fence_payload const& payload) noexcept;
-        void destroy_payload(semaphore_payload const& payload) noexcept;
-        void destroy_payload(command_pool_payload const& payload) noexcept;
-        void destroy_payload(command_buffer_payload const& payload) noexcept;
-        void destroy_payload(shader_payload const& payload) noexcept;
-        void destroy_payload(descriptor_set_layout_payload const& payload) noexcept;
-        void destroy_payload(descriptor_pool_payload const& payload) noexcept;
-        void destroy_payload(descriptor_set_payload const& payload) noexcept;
-        void destroy_payload(pipeline_layout_payload const& payload) noexcept;
-        void destroy_payload(pipeline_payload const& payload) noexcept;
-        void destroy_payload(pipeline_cache_payload const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_image_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_image_view_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_sampler_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_buffer_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_allocation_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_fence_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_bin_semaphore_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_timeline_semaphore_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_command_pool_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_command_buffer_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_shader_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_descriptor_set_layout_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_descriptor_pool_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_descriptor_set_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_pipeline_layout_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_pipeline_handle> const& payload) noexcept;
+        void destroy_payload(vk_object_payload<vk_pipeline_cache_handle> const& payload) noexcept;
     };
 }

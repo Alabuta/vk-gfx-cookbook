@@ -9,8 +9,6 @@ module;
 
 export module vkgc.vulkan_slot_map;
 
-import vkgc.vulkan_handle;
-
 export namespace vkgc
 {
     /*
@@ -39,7 +37,7 @@ export namespace vkgc
         sizeof(T) >= sizeof(std::uint32_t) &&
         alignof(T) >= alignof(std::uint32_t);
 
-    template <typename Tag, VkSlotMapPayload Payload>
+    template <typename Handle, VkSlotMapPayload Payload>
     class vulkan_slot_map final
     {
     public:
@@ -54,14 +52,14 @@ export namespace vkgc
         vulkan_slot_map& operator=(vulkan_slot_map&&) = delete;
 
         [[nodiscard]]
-        vk_object_handle<Tag> insert(Payload payload)
+        Handle insert(Payload payload)
         {
             return emplace(payload);
         }
 
         template <typename... Args>
         [[nodiscard]]
-        vk_object_handle<Tag> emplace(Args&&... args)
+        Handle emplace(Args&&... args)
         {
             std::uint32_t slot_index{0};
 
@@ -86,21 +84,21 @@ export namespace vkgc
 
             ++live_count_;
 
-            return vk_object_handle<Tag>{
+            return Handle{
                 .index{slot_index},
                 .generation{slot.generation}
             };
         }
 
         [[nodiscard]]
-        Payload const* try_get(vk_object_handle<Tag> const handle) const noexcept
+        Payload const* try_get(Handle const handle) const noexcept
         {
             slot_t const* slot = locate(handle);
             return slot != nullptr ? &slot->payload : nullptr;
         }
 
         [[nodiscard]]
-        bool is_alive(vk_object_handle<Tag> const handle) const noexcept
+        bool is_alive(Handle const handle) const noexcept
         {
             return locate(handle) != nullptr;
         }
@@ -108,7 +106,7 @@ export namespace vkgc
         // Detaches the slot without performing any vkDestroy / vmaFreeMemory.
         // The caller (vulkan_object_registry) is responsible for releasing the
         // underlying VkXxx before invoking release().
-        Payload release(vk_object_handle<Tag> handle)
+        Payload release(Handle handle)
         {
             slot_t* slot = locate(handle);
             if (slot == nullptr)
@@ -141,7 +139,7 @@ export namespace vkgc
                     continue;
                 }
 
-                vk_object_handle<Tag> handle{
+                Handle handle{
                     .index{i},
                     .generation{slot.generation}
                 };
@@ -182,7 +180,7 @@ export namespace vkgc
 
         template <typename S>
         [[nodiscard]]
-        auto locate(this S&& self, vk_object_handle<Tag> const handle) noexcept
+        auto locate(this S&& self, Handle const handle) noexcept
             -> std::conditional_t<std::is_const_v<std::remove_reference_t<S>>, slot_t const*, slot_t*>
         {
             if (handle.generation == 0 || handle.index >= self.slots_.size())
