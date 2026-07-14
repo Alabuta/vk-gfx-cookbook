@@ -404,4 +404,4 @@ namespace vkgc
 
         return allocation_info;
     }
-} // namespace vkgc
+}
