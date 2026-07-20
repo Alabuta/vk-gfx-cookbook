@@ -24,26 +24,6 @@ export namespace vkgc
         VkImageUsageFlags image_usage_flags{};
     };
 
-    struct swapchain_create_info
-    {
-        VkExtent2D extent{};
-        VkSurfaceFormatKHR surface_format{};
-        VkPresentModeKHR present_mode{VK_PRESENT_MODE_FIFO_KHR};
-        VkImageUsageFlags image_usage_flags{};
-        std::uint32_t min_image_count{0};
-        VkSurfaceTransformFlagBitsKHR pre_transform{VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR};
-    };
-
-    struct presenter_create_info
-    {
-        VkSurfaceKHR surface{VK_NULL_HANDLE};
-        std::vector<VkSurfaceFormatKHR> preferred_surface_formats{};
-        std::vector<VkPresentModeKHR> preferred_present_modes{};
-        VkExtent2D image_extent{};
-        std::uint32_t min_image_count{0};
-        VkImageUsageFlags image_usage_flags{};
-    };
-
     struct swapchain_image_acquire_result
     {
         vk_bin_semaphore_handle image_acquired{};

@@ -31,6 +31,16 @@ namespace
         std::vector<VkPresentModeKHR> supported_modes{};
     };
 
+    struct swapchain_create_info
+    {
+        VkExtent2D extent{};
+        VkSurfaceFormatKHR surface_format{};
+        VkPresentModeKHR present_mode{VK_PRESENT_MODE_FIFO_KHR};
+        VkImageUsageFlags image_usage_flags{};
+        std::uint32_t min_image_count{0};
+        VkSurfaceTransformFlagBitsKHR pre_transform{VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR};
+    };
+
     std::optional<presentation_capabilities> query_presentation_capabilities(
         VkPhysicalDevice physical_device,
         VkSurfaceKHR surface)
@@ -127,12 +137,12 @@ namespace
         return {};
     }
 
-    std::optional<vkgc::swapchain_create_info> build_swapchain_create_info(
+    std::optional<swapchain_create_info> build_swapchain_create_info(
         VkPhysicalDevice physical_device,
         VkSurfaceKHR surface,
         vkgc::swapchain_params const& swapchain_params)
     {
-        vkgc::swapchain_create_info swapchain_info{};
+        swapchain_create_info swapchain_info{};
 
         auto const present_capabilities = query_presentation_capabilities(physical_device, surface);
         if (!VKGC_ENSURE(present_capabilities.has_value()))
