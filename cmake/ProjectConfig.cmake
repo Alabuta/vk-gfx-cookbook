@@ -95,6 +95,10 @@ function(vkgc_attach_common_sources TARGET_NAME)
 
             # vulkan/registry
             ${COMMON_DIR}/vulkan/registry/registry.cxx
+            ${COMMON_DIR}/vulkan/registry/memory_resources.cxx
+            ${COMMON_DIR}/vulkan/registry/synchronization.cxx
+            ${COMMON_DIR}/vulkan/registry/command_buffers.cxx
+            ${COMMON_DIR}/vulkan/registry/pipeline_objects.cxx
             ${COMMON_DIR}/vulkan/registry/destructors.cxx
 
             # vulkan/helpers
