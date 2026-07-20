@@ -26,8 +26,8 @@
 
 #include "GLFW/glfw3.h"
 
-#include "vulkan/format.hxx"
 #include "vulkan/assert.hxx"
+#include "vulkan/format.hxx"
 
 std::string_view constexpr kCacheDir{COOKBOOK_CACHE_DIR_STRING};
 std::string_view constexpr kAssetDir{COOKBOOK_ASSET_DIR_STRING};
