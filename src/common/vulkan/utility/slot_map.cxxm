@@ -51,12 +51,6 @@ export namespace vkgc
         vulkan_slot_map& operator=(vulkan_slot_map const&) = delete;
         vulkan_slot_map& operator=(vulkan_slot_map&&) = delete;
 
-        [[nodiscard]]
-        Handle insert(Payload payload)
-        {
-            return emplace(payload);
-        }
-
         template <typename... Args>
         [[nodiscard]]
         Handle emplace(Args&&... args)
