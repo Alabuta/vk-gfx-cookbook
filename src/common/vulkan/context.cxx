@@ -20,7 +20,7 @@ namespace vkgc
         : instance_{info.instance},
           device_{instance_.create_device(info.device)}
     {
-        VKGC_CHECKF(!g_context_alive.exchange(true), "only one vulkan_context may be alive at a time");
+        VKGC_VERIFYF(!g_context_alive.exchange(true), "only one vulkan_context may be alive at a time");
     }
 
     vulkan_context::~vulkan_context()
