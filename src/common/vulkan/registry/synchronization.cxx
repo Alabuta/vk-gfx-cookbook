@@ -1,6 +1,5 @@
 module;
 
-#include <bit>
 #include <cstdint>
 #include <print>
 
@@ -32,9 +31,7 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_FENCE, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_fence_handle>().emplace(handle);
+        return finalize_created_object<vk_fence_handle>(VK_OBJECT_TYPE_FENCE, handle, debug_name);
     }
 
     vk_bin_semaphore_handle vulkan_object_registry::create_binary_semaphore(char const* debug_name)
@@ -60,9 +57,7 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_bin_semaphore_handle>().emplace(handle);
+        return finalize_created_object<vk_bin_semaphore_handle>(VK_OBJECT_TYPE_SEMAPHORE, handle, debug_name);
     }
 
     vk_timeline_semaphore_handle vulkan_object_registry::create_timeline_semaphore(
@@ -90,9 +85,6 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_SEMAPHORE, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_timeline_semaphore_handle>().emplace(handle);
-
+        return finalize_created_object<vk_timeline_semaphore_handle>(VK_OBJECT_TYPE_SEMAPHORE, handle, debug_name);
     }
 }

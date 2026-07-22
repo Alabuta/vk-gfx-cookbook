@@ -95,12 +95,8 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(
-            VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT,
-            std::bit_cast<std::uint64_t>(handle),
-            debug_name);
-
-        return slot_map<vk_descriptor_set_layout_handle>().emplace(handle);
+        return finalize_created_object<vk_descriptor_set_layout_handle>(
+            VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT, handle, debug_name);
     }
 
     vk_descriptor_pool_handle vulkan_object_registry::create_descriptor_pool(
@@ -115,12 +111,8 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(
-            VK_OBJECT_TYPE_DESCRIPTOR_POOL,
-            std::bit_cast<std::uint64_t>(handle),
-            debug_name);
-
-        return slot_map<vk_descriptor_pool_handle>().emplace(handle, info.flags);
+        return finalize_created_object<vk_descriptor_pool_handle>(
+            VK_OBJECT_TYPE_DESCRIPTOR_POOL, handle, debug_name, info.flags);
     }
 
     std::vector<vk_descriptor_set_handle> vulkan_object_registry::allocate_descriptor_sets(
@@ -213,9 +205,7 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_LAYOUT, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_pipeline_layout_handle>().emplace(handle);
+        return finalize_created_object<vk_pipeline_layout_handle>(VK_OBJECT_TYPE_PIPELINE_LAYOUT, handle, debug_name);
     }
 
     vk_pipeline_cache_handle vulkan_object_registry::create_pipeline_cache_from_data(
@@ -243,9 +233,7 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_CACHE, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_pipeline_cache_handle>().emplace(handle);
+        return finalize_created_object<vk_pipeline_cache_handle>(VK_OBJECT_TYPE_PIPELINE_CACHE, handle, debug_name);
     }
 
     vk_pipeline_cache_handle vulkan_object_registry::create_pipeline_cache_empty(char const* debug_name)
@@ -266,9 +254,7 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE_CACHE, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_pipeline_cache_handle>().emplace(handle);
+        return finalize_created_object<vk_pipeline_cache_handle>(VK_OBJECT_TYPE_PIPELINE_CACHE, handle, debug_name);
     }
 
     vk_pipeline_handle vulkan_object_registry::create_graphics_pipeline(
@@ -290,8 +276,6 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_PIPELINE, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_pipeline_handle>().emplace(handle);
+        return finalize_created_object<vk_pipeline_handle>(VK_OBJECT_TYPE_PIPELINE, handle, debug_name);
     }
 }

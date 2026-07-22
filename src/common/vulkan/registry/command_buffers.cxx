@@ -1,7 +1,6 @@
 module;
 
 #include <algorithm>
-#include <bit>
 #include <cstdint>
 #include <print>
 #include <vector>
@@ -30,9 +29,8 @@ namespace vkgc
             return {};
         }
 
-        device_.set_debug_object_name(VK_OBJECT_TYPE_COMMAND_POOL, std::bit_cast<std::uint64_t>(handle), debug_name);
-
-        return slot_map<vk_command_pool_handle>().emplace(handle, info.queueFamilyIndex);
+        return finalize_created_object<vk_command_pool_handle>(
+            VK_OBJECT_TYPE_COMMAND_POOL, handle, debug_name, info.queueFamilyIndex);
     }
 
     std::vector<vk_command_buffer_handle> vulkan_object_registry::allocate_command_buffers(

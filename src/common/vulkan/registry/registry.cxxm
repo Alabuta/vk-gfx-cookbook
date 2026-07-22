@@ -1,8 +1,10 @@
 module;
 
+#include <bit>
 #include <cstddef>
 #include <cstdint>
 #include <tuple>
+#include <utility>
 #include <vector>
 #include <span>
 
@@ -213,13 +215,25 @@ export namespace vkgc
         vulkan_device const& device_;
         slot_map_tuple slot_maps_;
 
-        template <typename Handle, typename S>
+        template <typename T, typename S>
         auto slot_map(this S&& self) noexcept
             -> std::conditional_t<
                 std::is_const_v<std::remove_reference_t<S>>,
-                vulkan_slot_map<Handle, vk_object_payload<Handle>> const&, vulkan_slot_map<Handle, vk_object_payload<Handle>>&>
+                vulkan_slot_map<T, vk_object_payload<T>> const&, vulkan_slot_map<T, vk_object_payload<T>>&>
         {
-            return std::get<vulkan_slot_map<Handle, vk_object_payload<Handle>>>(self.slot_maps_);
+            return std::get<vulkan_slot_map<T, vk_object_payload<T>>>(self.slot_maps_);
+        }
+
+        template <typename Handle, typename NativeHandle, typename... PayloadArgs>
+        [[nodiscard]]
+        Handle finalize_created_object(
+            VkObjectType const object_type,
+            NativeHandle const native_handle,
+            char const* const debug_name,
+            PayloadArgs&&... payload_args)
+        {
+            device_.set_debug_object_name(object_type, std::bit_cast<std::uint64_t>(native_handle), debug_name);
+            return slot_map<Handle>().emplace(native_handle, std::forward<PayloadArgs>(payload_args)...);
         }
 
         template <typename Handle>
@@ -233,7 +247,7 @@ export namespace vkgc
 
         /*
          * Per-payload destruction. One free function per payload type;
-         * vulkan_object_registry::destroy<Handle> dispatches to the matching overload via the payload type.
+         * vulkan_object_registry::destroy_immediate<Handle> dispatches to the matching overload via the payload type.
          */
         void destroy_payload(vk_object_payload<vk_image_handle> const& payload) noexcept;
         void destroy_payload(vk_object_payload<vk_image_view_handle> const& payload) noexcept;
