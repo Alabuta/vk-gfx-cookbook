@@ -92,6 +92,7 @@ function(vkgc_attach_common_sources TARGET_NAME)
 
             # vulkan/presentation
             ${COMMON_DIR}/vulkan/presentation/presenter.cxx
+            ${COMMON_DIR}/vulkan/presentation/swapchain.cxx
 
             # vulkan/registry
             ${COMMON_DIR}/vulkan/registry/registry.cxx
@@ -102,7 +103,9 @@ function(vkgc_attach_common_sources TARGET_NAME)
             ${COMMON_DIR}/vulkan/registry/destructors.cxx
 
             # vulkan/helpers
-            ${COMMON_DIR}/vulkan/helpers/resource_helpers.cxx
+            ${COMMON_DIR}/vulkan/helpers/buffers.cxx
+            ${COMMON_DIR}/vulkan/helpers/images.cxx
+            ${COMMON_DIR}/vulkan/helpers/memory_binding.cxx
 
             # geometry
             ${COMMON_DIR}/geometry/box.cxx
@@ -151,6 +154,16 @@ function(vkgc_attach_common_sources TARGET_NAME)
 
                     # geometry
                     ${COMMON_DIR}/geometry/geometry.cxxm
+    )
+
+    target_link_libraries(${TARGET_NAME}
+        PRIVATE
+            vkgc::dependencies::vulkan
+            vkgc::dependencies::windowing
+            vkgc::dependencies::math
+            vkgc::dependencies::concurrency
+            vkgc::dependencies::stdcxx_extras
+            vkgc::config::cookbook_paths
     )
 
 endfunction()
