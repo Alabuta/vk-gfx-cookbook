@@ -242,289 +242,64 @@ namespace
         return result;
     }
 
-    // Records commands into a one-shot command buffer from `command_pool`, submits them on the
-    // main queue, and blocks until the GPU finishes.
-    [[nodiscard]]
-    bool submit_once(
-        vkgc::vulkan_context const& vk_context,
-        vkgc::vulkan_object_registry& vk_object_registry,
-        vkgc::vk_command_pool_handle const command_pool,
-        auto const& record_commands)
+    struct loaded_rgba8_image
     {
-        auto const one_time_command_buffers = vk_object_registry.allocate_command_buffers(command_pool, 1, true);
-        if (!VKGC_ENSURE(!one_time_command_buffers.empty()))
-        {
-            return false;
-        }
+        std::uint32_t width{0};
+        std::uint32_t height{0};
+        std::vector<std::byte> pixels;
+        bool valid{false};
+    };
 
-        auto const command_buffer = one_time_command_buffers.front();
-
-        vkgc::scope_guard const free_command_buffer{
-            [&] { vk_object_registry.destroy_immediate(command_buffer); }
-        };
-
-        auto const command_buffer_handle = vk_object_registry.resolve_handle(command_buffer);
-        if (!VKGC_ENSURE_VKHANDLE(command_buffer_handle))
-        {
-            return false;
-        }
-
-        VkCommandBufferBeginInfo constexpr begin_info{
-            .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO},
-            .pNext{nullptr},
-            .flags{VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT},
-            .pInheritanceInfo{nullptr}
-        };
-
-        if (!VKGC_ENSURE_VKSUCCESS(vkBeginCommandBuffer(command_buffer_handle, &begin_info)))
-        {
-            return false;
-        }
-
-        record_commands(command_buffer_handle);
-
-        if (!VKGC_ENSURE_VKSUCCESS(vkEndCommandBuffer(command_buffer_handle)))
-        {
-            return false;
-        }
-
-        auto const submit_fence = vk_object_registry.create_fence(false, "one-shot submit fence");
-        if (!VKGC_ENSURE(submit_fence.is_valid()))
-        {
-            return false;
-        }
-
-        vkgc::scope_guard const free_fence{[&] { vk_object_registry.destroy_immediate(submit_fence); }};
-
-        auto const submit_fence_handle = vk_object_registry.resolve_handle(submit_fence);
-        if (!VKGC_ENSURE_VKHANDLE(submit_fence_handle))
-        {
-            return false;
-        }
-
-        VkCommandBufferSubmitInfo const command_buffer_submit_info{
-            .sType{VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO},
-            .pNext{nullptr},
-            .commandBuffer{command_buffer_handle},
-            .deviceMask{0}
-        };
-
-        VkSubmitInfo2 const submit_info{
-            .sType{VK_STRUCTURE_TYPE_SUBMIT_INFO_2},
-            .pNext{nullptr},
-            .flags{0},
-            .waitSemaphoreInfoCount{0},
-            .pWaitSemaphoreInfos{nullptr},
-            .commandBufferInfoCount{1},
-            .pCommandBufferInfos{&command_buffer_submit_info},
-            .signalSemaphoreInfoCount{0},
-            .pSignalSemaphoreInfos{nullptr}
-        };
-
-        if (!VKGC_ENSURE_VKSUCCESS(
-                vkQueueSubmit2(vk_context.device().main_queue(), 1, &submit_info, submit_fence_handle)))
-        {
-            return false;
-        }
-
-        if (!VKGC_ENSURE_VKSUCCESS(
-                vkWaitForFences(
-                    vk_context.device().handle(),
-                    1,
-                    &submit_fence_handle,
-                    VK_TRUE,
-                    std::numeric_limits<std::uint64_t>::max())))
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    // Copies `bytes` into a persistently mapped staging buffer through its VMA mapping.
-    [[nodiscard]]
-    bool populate_staging(
-        vkgc::vulkan_context const& vk_context,
-        vkgc::vulkan_object_registry const& vk_object_registry,
-        vkgc::vk_buffer_handle const staging_buffer,
-        std::span<std::byte const> const bytes)
+    // Decodes `image_path` into 8-bit RGBA pixels via stb_image, forcing 4 channels
+    // regardless of the source format (matches the VK_FORMAT_R8G8B8A8_SRGB sampled image
+    // run_app creates for it). Generic decode, not glTF-specific, even though the sole
+    // current caller sources the path from a glTF material.
+    loaded_rgba8_image load_rgba8_image(std::filesystem::path const& image_path)
     {
-        auto const allocation = vk_object_registry.bound_allocation(staging_buffer);
-        if (!VKGC_ENSURE(allocation.is_valid()))
+        loaded_rgba8_image result;
+
+        std::string const path_str = image_path.string();
+
+        int width{0};
+        int height{0};
+        int channels{0};
+
+        stbi_uc* const pixels = stbi_load(path_str.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+        if (pixels == nullptr)
         {
-            return false;
+            std::println(stderr, "[stb] : Warning : failed to decode base-color texture [{}]", path_str);
+            return result;
         }
 
-        auto const memory_property_flags = get_allocation_memory_properties(vk_context, vk_object_registry, allocation);
-        if (!VKGC_ENSUREF(
-                (memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0,
-                "non-host-coherent memory type requires explicit sync (flush)"))
-        {
-            return false;
-        }
+        vkgc::scope_guard const free_pixels{[&] { stbi_image_free(pixels); }};
 
-        auto const allocation_info = get_vma_allocation_info(vk_context, vk_object_registry, allocation);
-        if (!VKGC_ENSURE(allocation_info.allocationInfo.pMappedData != nullptr))
-        {
-            return false;
-        }
+        std::println(
+            "[stb] : decoded base-color texture [{}] : {}x{}, {} source channels",
+            path_str,
+            width,
+            height,
+            channels);
 
-        std::memcpy(allocation_info.allocationInfo.pMappedData, bytes.data(), bytes.size());
+        result.width = static_cast<std::uint32_t>(width);
+        result.height = static_cast<std::uint32_t>(height);
 
-        return true;
-    }
+        // stbi_image_free fires when this function returns; copy the bytes out since the
+        // caller can no longer hold a span over stb's buffer once it's freed.
+        auto const image_size_bytes = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
+        auto const pixel_bytes = std::as_bytes(std::span{pixels, image_size_bytes});
+        result.pixels.assign(pixel_bytes.begin(), pixel_bytes.end());
 
-    // Uploads `bytes` into `dst_buffer`: a direct host-mapped write when the destination
-    // memory allows it, otherwise a staging buffer and a one-shot GPU copy.
-    [[nodiscard]]
-    bool upload_buffer(
-        vkgc::vulkan_context const& vk_context,
-        vkgc::vulkan_object_registry& vk_object_registry,
-        vkgc::vk_command_pool_handle const command_pool,
-        vkgc::vk_buffer_handle const dst_buffer,
-        std::span<std::byte const> const bytes)
-    {
-        auto const allocation = vk_object_registry.bound_allocation(dst_buffer);
-        if (!VKGC_ENSURE(allocation.is_valid()))
-        {
-            return false;
-        }
-
-        auto const memory_property_flags = get_allocation_memory_properties(
-            vk_context,
-            vk_object_registry,
-            allocation);
-
-        if ((memory_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0)
-        {
-            auto const allocation_info = get_vma_allocation_info(vk_context, vk_object_registry, allocation);
-
-            void* mapped_ptr;
-            if (!VKGC_ENSURE_VKSUCCESS(
-                    vkMapMemory(
-                        vk_context.device().handle(),
-                        allocation_info.allocationInfo.deviceMemory,
-                        allocation_info.allocationInfo.offset,
-                        bytes.size(),
-                        0,
-                        &mapped_ptr)))
-            {
-                return false;
-            }
-
-            std::memcpy(mapped_ptr, bytes.data(), bytes.size());
-
-            if ((memory_property_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0)
-            {
-                VkMappedMemoryRange const mapped_range{
-                    VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-                    nullptr,
-                    allocation_info.allocationInfo.deviceMemory,
-                    allocation_info.allocationInfo.offset,
-                    bytes.size()
-                };
-
-                vkFlushMappedMemoryRanges(vk_context.device().handle(), 1, &mapped_range);
-            }
-
-            vkUnmapMemory(vk_context.device().handle(), allocation_info.allocationInfo.deviceMemory);
-
-            return true;
-        }
-
-        // Non-mappable destination memory: route the data through a staging buffer and a
-        // one-shot transfer submission.
-        auto const staging_buffer = vkgc::create_staging_buffer(vk_object_registry, bytes.size());
-        if (!staging_buffer.is_valid())
-        {
-            return false;
-        }
-
-        vkgc::scope_guard const free_staging_buffer{[&] { vk_object_registry.destroy_immediate(staging_buffer); }};
-
-        if (!populate_staging(vk_context, vk_object_registry, staging_buffer, bytes))
-        {
-            return false;
-        }
-
-        auto const src_buffer_handle = vk_object_registry.resolve_handle(staging_buffer);
-        if (!VKGC_ENSURE_VKHANDLE(src_buffer_handle))
-        {
-            return false;
-        }
-
-        auto const dst_buffer_handle = vk_object_registry.resolve_handle(dst_buffer);
-        if (!VKGC_ENSURE_VKHANDLE(dst_buffer_handle))
-        {
-            return false;
-        }
-
-        auto const record_buffer_copy = [&](VkCommandBuffer command_buffer)
-        {
-            VkBufferCopy2 const copy_region{
-                .sType{VK_STRUCTURE_TYPE_BUFFER_COPY_2},
-                .pNext{nullptr},
-                .srcOffset{0},
-                .dstOffset{0},
-                .size{static_cast<VkDeviceSize>(bytes.size())}
-            };
-
-            VkCopyBufferInfo2 const copy_buffer_info{
-                .sType{VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2},
-                .pNext{nullptr},
-                .srcBuffer{src_buffer_handle},
-                .dstBuffer{dst_buffer_handle},
-                .regionCount{1},
-                .pRegions{&copy_region}
-            };
-
-            vkCmdCopyBuffer2(command_buffer, &copy_buffer_info);
-
-            // The fence wait only synchronizes with the host; vertex/index fetch in later
-            // submissions needs its own memory dependency on the copy.
-            VkBufferMemoryBarrier2 const to_vertex_input{
-                .sType{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2},
-                .pNext{nullptr},
-                .srcStageMask{VK_PIPELINE_STAGE_2_COPY_BIT},
-                .srcAccessMask{VK_ACCESS_2_TRANSFER_WRITE_BIT},
-                .dstStageMask{VK_PIPELINE_STAGE_2_VERTEX_ATTRIBUTE_INPUT_BIT | VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT},
-                .dstAccessMask{VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_2_INDEX_READ_BIT},
-                .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                .buffer{dst_buffer_handle},
-                .offset{0},
-                .size{VK_WHOLE_SIZE}
-            };
-
-            VkDependencyInfo const dependency_info{
-                .sType{VK_STRUCTURE_TYPE_DEPENDENCY_INFO},
-                .pNext{nullptr},
-                .dependencyFlags{},
-                .memoryBarrierCount{0},
-                .pMemoryBarriers{nullptr},
-                .bufferMemoryBarrierCount{1},
-                .pBufferMemoryBarriers{&to_vertex_input},
-                .imageMemoryBarrierCount{0},
-                .pImageMemoryBarriers{nullptr},
-            };
-
-            vkCmdPipelineBarrier2(command_buffer, &dependency_info);
-        };
-
-        return submit_once(vk_context, vk_object_registry, command_pool, record_buffer_copy);
+        result.valid = true;
+        return result;
     }
 }
 
-static bool run_app(std::uint32_t width, std::uint32_t height)
+static bool run_app(
+    vkgc::vulkan_context& vk_context,
+    vkgc::vulkan_object_registry& vk_object_registry,
+    vkgc::window& window)
 {
-    vkgc::vulkan_context vk_context{{.instance{.enable_validation{true}}}};
-    VKGC_VERIFY(vk_context.is_valid());
-
-    vkgc::window window{"Chapter 03 — glTF", width, height};
-    VKGC_VERIFY(window.is_valid());
-    VKGC_VERIFY(window.create_surface(vk_context.instance().handle()));
-
-    vkgc::vulkan_object_registry vk_object_registry{vk_context.device()};
+    auto [width, height] = window.get_size();
 
     vkgc::swapchain_params swapchain_params{
         .preferred_surface_formats{
@@ -773,28 +548,12 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     if (!mesh.base_color_texture_path.empty())
     {
-        std::string const texture_path = mesh.base_color_texture_path.string();
-
-        int texture_width{0};
-        int texture_height{0};
-        int texture_channels{0};
-
-        stbi_uc* const pixels =
-            stbi_load(texture_path.c_str(), &texture_width, &texture_height, &texture_channels, STBI_rgb_alpha);
-        if (pixels != nullptr)
+        auto const base_color_image = load_rgba8_image(mesh.base_color_texture_path);
+        if (base_color_image.valid)
         {
-            vkgc::scope_guard const free_pixels{[&] { stbi_image_free(pixels); }};
-
-            std::println(
-                "[stb] : decoded base-color texture [{}] : {}x{}, {} source channels",
-                texture_path,
-                texture_width,
-                texture_height,
-                texture_channels);
-
             VkExtent3D const texture_extent{
-                .width{static_cast<std::uint32_t>(texture_width)},
-                .height{static_cast<std::uint32_t>(texture_height)},
+                .width{base_color_image.width},
+                .height{base_color_image.height},
                 .depth{1}
             };
 
@@ -837,9 +596,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 return false;
             }
 
-            auto const texture_size_bytes =
-                static_cast<std::size_t>(texture_width) * static_cast<std::size_t>(texture_height) * 4u;
-            auto const texture_data = std::as_bytes(std::span{pixels, texture_size_bytes});
+            auto const texture_data = std::span{base_color_image.pixels};
 
             auto const staging_buffer = vkgc::create_staging_buffer(vk_object_registry, texture_data.size());
             if (!staging_buffer.is_valid())
@@ -851,7 +608,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
                 [&] { vk_object_registry.destroy_immediate(staging_buffer); }
             };
 
-            if (!populate_staging(vk_context, vk_object_registry, staging_buffer, texture_data))
+            if (!upload_buffer(vk_context, vk_object_registry, main_queue_command_pool, staging_buffer, texture_data))
             {
                 return false;
             }
@@ -982,10 +739,6 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             {
                 return false;
             }
-        }
-        else
-        {
-            std::println(stderr, "[stb] : Warning : failed to decode base-color texture [{}]", texture_path);
         }
     }
     else
@@ -1298,8 +1051,14 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
     {
         pipeline_cache = vk_object_registry.create_pipeline_cache_from_data(cache_data, "gltf pipeline cache");
     }
+
+    if (pipeline_cache.is_valid())
+    {
+        std::println("[Vulkan] : loaded pipeline cache from [{}]", pipeline_cache_path.string());
+    }
     else
     {
+        std::println("[Vulkan] : no pipeline cache found at [{}], creating a new one", pipeline_cache_path.string());
         pipeline_cache = vk_object_registry.create_pipeline_cache_empty("gltf pipeline cache");
     }
 
@@ -1824,11 +1583,22 @@ int main()
 {
     vkgc::bootstrap_app();
 
-    auto const [width, height] = std::pair<std::uint32_t, std::uint32_t>{1280, 800};
-
-    if (!run_app(width, height))
     {
-        return -1;
+        auto const [width, height] = std::pair<std::uint32_t, std::uint32_t>{1280, 800};
+
+        vkgc::vulkan_context vk_context{{.enable_validation{true}}, {}};
+        VKGC_VERIFY(vk_context.is_valid());
+
+        vkgc::vulkan_object_registry vk_object_registry{vk_context.device()};
+
+        vkgc::window window{"Chapter 03 — glTF", width, height};
+        VKGC_VERIFY(window.is_valid());
+        VKGC_VERIFY(window.create_surface(vk_context.instance().handle()));
+
+        if (!run_app(vk_context, vk_object_registry, window))
+        {
+            return -1;
+        }
     }
 
     vkgc::terminate_app();
