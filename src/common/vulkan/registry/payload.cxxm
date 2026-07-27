@@ -19,12 +19,25 @@ export namespace vkgc
     struct vk_object_payload<vk_image_handle>
     {
         VkImage handle{VK_NULL_HANDLE};
+
         VkFormat format{VK_FORMAT_UNDEFINED};
         VkExtent3D extent{};
         std::uint32_t mip_levels{1};
         std::uint32_t array_layers{1};
 
         vk_allocation_handle allocation{};
+
+        // :TODO: add default VkImageView, default bindless slot index and immutable desc
+
+        // :TODO: add eager primary view (full resource access)
+        // VkImageView default{VK_NULL_HANDLE};
+        // uint32_t bindless_slot{0};
+
+        // :TODO: add subresource views (lazy cache)
+        // :TODO: add pre-allocated fast views (e.g., per-mip storage views for compute)
+
+        // :TODO: add layout & synchronization tracking
+        // VkImageLayout current_layout;
     };
 
     template <>
