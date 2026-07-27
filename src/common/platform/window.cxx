@@ -136,7 +136,7 @@ namespace vkgc
         return handle_ == nullptr || glfwWindowShouldClose(handle_) == GLFW_TRUE;
     }
 
-    bool window::create_surface(VkInstance const instance) noexcept
+    bool window::create_surface(VkInstance instance) noexcept
     {
         if (!VKGC_ENSURE_VKHANDLE(instance) || !VKGC_ENSURE(handle_ != nullptr))
         {
