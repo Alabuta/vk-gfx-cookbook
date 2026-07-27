@@ -51,22 +51,6 @@ namespace vkgc
         return vk_object_registry.create_memory_bound_buffer(buffer_create_info, buffer_allocation_info);
     }
 
-    vk_buffer_handle create_vertex_buffer(vulkan_object_registry& vk_object_registry, std::size_t const size)
-    {
-        return create_host_writable_buffer(
-            vk_object_registry,
-            size,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    }
-
-    vk_buffer_handle create_index_buffer(vulkan_object_registry& vk_object_registry, std::size_t const size)
-    {
-        return create_host_writable_buffer(
-            vk_object_registry,
-            size,
-            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    }
-
     vk_buffer_handle create_staging_buffer(vulkan_object_registry& vk_object_registry, std::size_t const size)
     {
         if (!VKGC_ENSURE(size > 0))
@@ -104,4 +88,21 @@ namespace vkgc
             buffer_allocation_info,
             "staging buffer");
     }
+
+    vk_buffer_handle create_vertex_buffer(vulkan_object_registry& vk_object_registry, std::size_t const size)
+    {
+        return create_host_writable_buffer(
+            vk_object_registry,
+            size,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    }
+
+    vk_buffer_handle create_index_buffer(vulkan_object_registry& vk_object_registry, std::size_t const size)
+    {
+        return create_host_writable_buffer(
+            vk_object_registry,
+            size,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    }
+
 }

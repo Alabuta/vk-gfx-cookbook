@@ -2,8 +2,10 @@ module;
 
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <span>
 #include <vector>
+#include <functional>
 
 #include <volk.h>
 #include "vk_mem_alloc.h"
@@ -11,8 +13,10 @@ module;
 export module vkgc.vulkan_resource_helpers;
 
 import vkgc.vulkan_handle;
+import vkgc.vulkan_device;
 import vkgc.vulkan_context;
 import vkgc.vulkan_object_registry;
+import vkgc.scope_guard;
 
 export namespace vkgc
 {
@@ -48,6 +52,18 @@ export namespace vkgc
         vk_image_handle& image,
         vk_image_view_handle& image_view);
 
+    [[nodiscard]]
+    vk_buffer_handle create_host_writable_buffer(
+        vulkan_object_registry& vk_object_registry,
+        std::size_t size,
+        VkBufferUsageFlags usage);
+
+    // Creates a host-visible, persistently mapped staging buffer of `size` bytes
+    // for use as a transfer source. The caller populates it through the mapping
+    // reported by get_vma_allocation_info; returns an invalid handle when `size` is zero.
+    [[nodiscard]]
+    vk_buffer_handle create_staging_buffer(vulkan_object_registry& vk_object_registry, std::size_t size);
+
     // Creates a host-writable, device-local buffer of `size` bytes for the given
     // role, also usable as a transfer destination when the allocation ends up
     // non-mappable. Returns an invalid handle when `size` is zero.
@@ -56,12 +72,6 @@ export namespace vkgc
 
     [[nodiscard]]
     vk_buffer_handle create_index_buffer(vulkan_object_registry& vk_object_registry, std::size_t size);
-
-    // Creates a host-visible, persistently mapped staging buffer of `size` bytes
-    // for use as a transfer source. The caller populates it through the mapping
-    // reported by get_vma_allocation_info; returns an invalid handle when `size` is zero.
-    [[nodiscard]]
-    vk_buffer_handle create_staging_buffer(vulkan_object_registry& vk_object_registry, std::size_t size);
 
     [[nodiscard]]
     bool bind_image_memory(
@@ -75,6 +85,33 @@ export namespace vkgc
         vk_buffer_handle buffer,
         vk_allocation_handle memory);
 
+    // Records commands into a one-shot command buffer from `command_pool`, submits them on the
+    // main queue, and blocks until the GPU finishes.
+    [[nodiscard]]
+    bool submit_once(
+        vulkan_context const& vk_context,
+        vulkan_object_registry& vk_object_registry,
+        vk_command_pool_handle command_pool,
+        std::function<void(VkCommandBuffer)> const& record_commands);
+
+    // Uploads `bytes` into `buffer`: a direct host-mapped write when the destination
+    // memory allows it, otherwise a staging buffer and a one-shot GPU copy.
+    [[nodiscard]]
+    bool upload_buffer(
+        vulkan_context const& vk_context,
+        vulkan_object_registry& vk_object_registry,
+        vk_command_pool_handle command_pool,
+        vk_buffer_handle buffer,
+        std::span<std::byte const> bytes);
+
+    [[nodiscard]]
+    bool upload_host_mapped_buffer(
+        vulkan_context const& vk_context,
+        vulkan_object_registry const& vk_object_registry,
+        vk_buffer_handle buffer,
+        std::span<std::byte const> bytes,
+        bool flush_memory_after_upload);
+
     [[nodiscard]]
     VkMemoryPropertyFlags get_allocation_memory_properties(
         vulkan_context const& vk_context,
@@ -83,6 +120,18 @@ export namespace vkgc
 
     [[nodiscard]]
     VmaAllocationInfo2 get_vma_allocation_info(
+        vulkan_context const& vk_context,
+        vulkan_object_registry const& vk_object_registry,
+        vk_allocation_handle allocation);
+
+    [[nodiscard]]
+    bool is_host_visible_allocation(
+        vulkan_context const& vk_context,
+        vulkan_object_registry const& vk_object_registry,
+        vk_allocation_handle allocation);
+
+    [[nodiscard]]
+    bool is_host_coherent_allocation(
         vulkan_context const& vk_context,
         vulkan_object_registry const& vk_object_registry,
         vk_allocation_handle allocation);
