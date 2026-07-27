@@ -557,9 +557,10 @@ static bool run_app(
                 .depth{1}
             };
 
+            auto constexpr image_format = VK_FORMAT_R8G8B8A8_SRGB;
             if (!vkgc::create_sampled_texture(
                     vk_object_registry,
-                    VK_FORMAT_R8G8B8A8_SRGB,
+                    image_format,
                     texture_extent,
                     base_color_texture_image,
                     base_color_texture_image_view))
@@ -641,7 +642,7 @@ static bool run_app(
                         .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                         .image{texture_image_handle},
                         .subresourceRange{
-                            .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                            .aspectMask{vkgc::format_to_image_aspect(image_format)},
                             .baseMipLevel{0},
                             .levelCount{1},
                             .baseArrayLayer{0},
@@ -671,7 +672,7 @@ static bool run_app(
                     .bufferRowLength{0},
                     .bufferImageHeight{0},
                     .imageSubresource{
-                        .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                        .aspectMask{vkgc::format_to_image_aspect(image_format)},
                         .mipLevel{0},
                         .baseArrayLayer{0},
                         .layerCount{1}
@@ -706,7 +707,7 @@ static bool run_app(
                         .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                         .image{texture_image_handle},
                         .subresourceRange{
-                            .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                            .aspectMask{vkgc::format_to_image_aspect(image_format)},
                             .baseMipLevel{0},
                             .levelCount{1},
                             .baseArrayLayer{0},
@@ -1256,7 +1257,7 @@ static bool run_app(
                     .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                     .image{swapchain_image},
                     .subresourceRange{
-                        .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                        .aspectMask{vkgc::format_to_image_aspect(presenter.surface_format().format)},
                         .baseMipLevel{0},
                         .levelCount{1},
                         .baseArrayLayer{0},
@@ -1276,7 +1277,7 @@ static bool run_app(
                     .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                     .image{depth_attachment_image_handle},
                     .subresourceRange{
-                        .aspectMask{VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT},
+                        .aspectMask{vkgc::format_to_image_aspect(depth_attachment_format)},
                         .baseMipLevel{0},
                         .levelCount{1},
                         .baseArrayLayer{0},
@@ -1444,7 +1445,7 @@ static bool run_app(
                 .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                 .image{swapchain_image},
                 .subresourceRange{
-                    .aspectMask{VK_IMAGE_ASPECT_COLOR_BIT},
+                    .aspectMask{vkgc::format_to_image_aspect(presenter.surface_format().format)},
                     .baseMipLevel{0},
                     .levelCount{1},
                     .baseArrayLayer{0},

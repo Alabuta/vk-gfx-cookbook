@@ -135,4 +135,7 @@ export namespace vkgc
         vulkan_context const& vk_context,
         vulkan_object_registry const& vk_object_registry,
         vk_allocation_handle allocation);
+
+    [[nodiscard]]
+    VkImageAspectFlags format_to_image_aspect(VkFormat format);
 }
