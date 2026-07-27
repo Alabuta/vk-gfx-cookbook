@@ -16,9 +16,9 @@ namespace
 
 namespace vkgc
 {
-    vulkan_context::vulkan_context(vulkan_context_info const& info) noexcept
-        : instance_{info.instance},
-          device_{instance_.create_device(info.device)}
+    vulkan_context::vulkan_context(vulkan_instance_info const& instance_ci, vulkan_device_info const& device_ci) noexcept
+        : instance_{instance_ci},
+          device_{instance_.create_device(device_ci)}
     {
         VKGC_VERIFYF(!g_context_alive.exchange(true), "only one vulkan_context may be alive at a time");
     }

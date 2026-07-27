@@ -5,17 +5,11 @@ import vkgc.vulkan_device;
 
 export namespace vkgc
 {
-    struct vulkan_context_info
-    {
-        vulkan_instance_info instance{};
-        vulkan_device_info device{};
-    };
-
     class vulkan_context final
     {
     public:
 
-        explicit vulkan_context(vulkan_context_info const& info) noexcept;
+        explicit vulkan_context(vulkan_instance_info const& instance_ci, vulkan_device_info const& device_ci) noexcept;
         ~vulkan_context();
 
         vulkan_context(vulkan_context const&) = delete;

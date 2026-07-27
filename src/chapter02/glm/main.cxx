@@ -46,7 +46,7 @@ namespace vkgc
 
 static bool run_app(std::uint32_t width, std::uint32_t height)
 {
-    vkgc::vulkan_context vk_context{{.instance{.enable_validation{true}}}};
+    vkgc::vulkan_context vk_context{{.enable_validation{true}}, {}};
     VKGC_VERIFY(vk_context.is_valid());
 
     vkgc::window window{"Chapter 02 — GLM", width, height};
