@@ -394,15 +394,11 @@ static bool run_app(
         return false;
     }
 
-    vkgc::vk_image_handle depth_attachment_image;
-    vkgc::vk_image_view_handle depth_attachment_image_view;
-
-    if (!vkgc::create_depth_attachment(
-            vk_object_registry,
-            depth_attachment_format,
-            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
-            depth_attachment_image,
-            depth_attachment_image_view))
+    auto depth_attachment_image = vkgc::create_depth_attachment(
+        vk_object_registry,
+        depth_attachment_format,
+        {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}});
+    if (!depth_attachment_image.is_valid())
     {
         std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
         return false;
@@ -417,7 +413,7 @@ static bool run_app(
 
         VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(vk_context.device().handle()));
 
-        vk_object_registry.destroy_immediate(depth_attachment_image_view);
+        // Destroying the image takes its default view with it.
         vk_object_registry.destroy_immediate(depth_attachment_image);
 
         for (auto const image_view_handle : swapchain_image_view_handles)
@@ -440,12 +436,11 @@ static bool run_app(
             return false;
         }
 
-        if (!vkgc::create_depth_attachment(
-                vk_object_registry,
-                depth_attachment_format,
-                {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
-                depth_attachment_image,
-                depth_attachment_image_view))
+        depth_attachment_image = vkgc::create_depth_attachment(
+            vk_object_registry,
+            depth_attachment_format,
+            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}});
+        if (!depth_attachment_image.is_valid())
         {
             std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
             return false;
@@ -543,7 +538,6 @@ static bool run_app(
     // Decode the base-color image CPU-side, move the pixels through a staging buffer into
     // a device-local sampled image, and create the sampler that will read it.
     vkgc::vk_image_handle base_color_texture_image;
-    vkgc::vk_image_view_handle base_color_texture_image_view;
     vkgc::vk_sampler_handle base_color_texture_sampler;
 
     if (!mesh.base_color_texture_path.empty())
@@ -558,12 +552,11 @@ static bool run_app(
             };
 
             auto constexpr image_format = VK_FORMAT_R8G8B8A8_SRGB;
-            if (!vkgc::create_sampled_texture(
-                    vk_object_registry,
-                    image_format,
-                    texture_extent,
-                    base_color_texture_image,
-                    base_color_texture_image_view))
+            base_color_texture_image = vkgc::create_sampled_texture(
+                vk_object_registry,
+                image_format,
+                texture_extent);
+            if (!base_color_texture_image.is_valid())
             {
                 std::println(stderr, "[Vulkan] : Error : failed to create base-color texture");
                 return false;
@@ -614,8 +607,10 @@ static bool run_app(
                 return false;
             }
 
-            auto const texture_image_handle = vk_object_registry.resolve_handle(base_color_texture_image);
-            if (!VKGC_ENSURE_VKHANDLE(texture_image_handle))
+            // One lookup covers the barriers and the copy below: native image plus the aspect
+            // mask the registry already derived from the format at creation time.
+            auto const texture = vk_object_registry.resolve_image(base_color_texture_image);
+            if (!VKGC_ENSURE_VKHANDLE(texture.image))
             {
                 return false;
             }
@@ -640,9 +635,9 @@ static bool run_app(
                         .newLayout{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
                         .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                         .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                        .image{texture_image_handle},
+                        .image{texture.image},
                         .subresourceRange{
-                            .aspectMask{vkgc::format_to_image_aspect(image_format)},
+                            .aspectMask{texture.desc.aspect},
                             .baseMipLevel{0},
                             .levelCount{1},
                             .baseArrayLayer{0},
@@ -672,7 +667,7 @@ static bool run_app(
                     .bufferRowLength{0},
                     .bufferImageHeight{0},
                     .imageSubresource{
-                        .aspectMask{vkgc::format_to_image_aspect(image_format)},
+                        .aspectMask{texture.desc.aspect},
                         .mipLevel{0},
                         .baseArrayLayer{0},
                         .layerCount{1}
@@ -685,7 +680,7 @@ static bool run_app(
                     .sType{VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2},
                     .pNext{nullptr},
                     .srcBuffer{staging_buffer_handle},
-                    .dstImage{texture_image_handle},
+                    .dstImage{texture.image},
                     .dstImageLayout{VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL},
                     .regionCount{1},
                     .pRegions{&copy_region}
@@ -705,9 +700,9 @@ static bool run_app(
                         .newLayout{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
                         .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                         .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                        .image{texture_image_handle},
+                        .image{texture.image},
                         .subresourceRange{
-                            .aspectMask{vkgc::format_to_image_aspect(image_format)},
+                            .aspectMask{texture.desc.aspect},
                             .baseMipLevel{0},
                             .levelCount{1},
                             .baseArrayLayer{0},
@@ -793,6 +788,7 @@ static bool run_app(
         glm::mat4 mvp{};
         glm::mat4 normal{};
         std::uint32_t texture_id{0};
+        std::uint32_t sampler_id{0};
     };
 
     VkPushConstantRange constexpr push_constant_range{
@@ -801,31 +797,51 @@ static bool run_app(
         .size{sizeof(per_frame_shader_data)}
     };
 
-    // Bindless combined image-sampler array the fragment shader indexes (binding 0, set 0).
-    // The layout only fixes the upper bound; update-after-bind + partially-bound +
-    // variable-count let the descriptor set carry however many textures actually load.
+    // Bindless arrays the fragment shader indexes separately: sampled images at binding 0,
+    // sampler states at binding 1 (set 0). The layout only fixes the upper bounds;
+    // update-after-bind + partially-bound let each array carry however many resources
+    // actually load. Variable-count sits on the samplers binding because the spec allows it
+    // only on the set's highest-numbered binding.
+    std::uint32_t constexpr max_bindless_textures{64};
     std::uint32_t constexpr max_bindless_samplers{64};
 
-    VkDescriptorSetLayoutBinding constexpr bindless_samplers_binding{
-        .binding{0},
-        .descriptorType{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-        .descriptorCount{max_bindless_samplers},
-        .stageFlags{VK_SHADER_STAGE_FRAGMENT_BIT},
-        .pImmutableSamplers{nullptr}
+    std::array constexpr bindless_bindings{
+        VkDescriptorSetLayoutBinding{
+            .binding{0},
+            .descriptorType{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE},
+            .descriptorCount{max_bindless_textures},
+            .stageFlags{VK_SHADER_STAGE_FRAGMENT_BIT},
+            .pImmutableSamplers{nullptr}
+        },
+        VkDescriptorSetLayoutBinding{
+            .binding{1},
+            .descriptorType{VK_DESCRIPTOR_TYPE_SAMPLER},
+            .descriptorCount{max_bindless_samplers},
+            .stageFlags{VK_SHADER_STAGE_FRAGMENT_BIT},
+            .pImmutableSamplers{nullptr}
+        }
     };
 
-    VkDescriptorBindingFlags constexpr bindless_samplers_binding_flags{
+    VkDescriptorBindingFlags constexpr bindless_shared_binding_flags{
         VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT |
         VK_DESCRIPTOR_BINDING_UPDATE_UNUSED_WHILE_PENDING_BIT |
-        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT |
-        VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+        VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT
     };
+
+    std::array constexpr bindless_binding_flags{
+        bindless_shared_binding_flags,
+        bindless_shared_binding_flags | VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT
+    };
+
+    static_assert(
+        bindless_binding_flags.size() == bindless_bindings.size(),
+        "each layout binding needs exactly one entry in the binding-flags array");
 
     VkDescriptorSetLayoutBindingFlagsCreateInfo const binding_flags_create_info{
         .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO},
         .pNext{nullptr},
-        .bindingCount{1},
-        .pBindingFlags{&bindless_samplers_binding_flags}
+        .bindingCount{static_cast<std::uint32_t>(bindless_binding_flags.size())},
+        .pBindingFlags{bindless_binding_flags.data()}
     };
 
     auto const descriptor_set_layout = vk_object_registry.create_descriptor_set_layout(
@@ -833,10 +849,10 @@ static bool run_app(
             .sType{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO},
             .pNext{&binding_flags_create_info},
             .flags{VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT},
-            .bindingCount{1},
-            .pBindings{&bindless_samplers_binding}
+            .bindingCount{static_cast<std::uint32_t>(bindless_bindings.size())},
+            .pBindings{bindless_bindings.data()}
         },
-        "gltf bindless sampler set layout");
+        "gltf bindless texture/sampler set layout");
     if (!VKGC_ENSURE(descriptor_set_layout.is_valid()))
     {
         return false;
@@ -848,9 +864,15 @@ static bool run_app(
         return false;
     }
 
-    VkDescriptorPoolSize constexpr bindless_samplers_pool_size{
-        .type{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-        .descriptorCount{max_bindless_samplers}
+    std::array constexpr bindless_pool_sizes{
+        VkDescriptorPoolSize{
+            .type{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE},
+            .descriptorCount{max_bindless_textures}
+        },
+        VkDescriptorPoolSize{
+            .type{VK_DESCRIPTOR_TYPE_SAMPLER},
+            .descriptorCount{max_bindless_samplers}
+        }
     };
 
     auto const descriptor_pool = vk_object_registry.create_descriptor_pool(
@@ -859,8 +881,8 @@ static bool run_app(
             .pNext{nullptr},
             .flags{VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT},
             .maxSets{1},
-            .poolSizeCount{1},
-            .pPoolSizes{&bindless_samplers_pool_size}
+            .poolSizeCount{static_cast<std::uint32_t>(bindless_pool_sizes.size())},
+            .pPoolSizes{bindless_pool_sizes.data()}
         },
         "gltf bindless descriptor pool");
     if (!VKGC_ENSURE(descriptor_pool.is_valid()))
@@ -881,12 +903,13 @@ static bool run_app(
         return false;
     }
 
-    // The fragment shader indexes kSamplers2D[0]; write the duck's base color there. With no
-    // texture loaded the slot stays unwritten and sampling it is undefined (partially-bound
-    // only makes unwritten descriptors legal to *leave* unwritten, not to read).
-    if (base_color_texture_image_view.is_valid() && base_color_texture_sampler.is_valid())
+    // The fragment shader indexes kTextures2D[0] and kSamplers[0]; write the duck's base
+    // color and its sampler there. With no texture loaded the slots stay unwritten and
+    // sampling them is undefined (partially-bound only makes unwritten descriptors legal to
+    // *leave* unwritten, not to read).
+    if (base_color_texture_image.is_valid() && base_color_texture_sampler.is_valid())
     {
-        auto const base_color_image_view_handle = vk_object_registry.resolve_handle(base_color_texture_image_view);
+        auto const base_color_image_view_handle = vk_object_registry.resolve_image(base_color_texture_image).view;
         if (!VKGC_ENSURE_VKHANDLE(base_color_image_view_handle))
         {
             return false;
@@ -905,26 +928,53 @@ static bool run_app(
             return false;
         }
 
+        // Split descriptors read only the member their type needs: the sampled image ignores
+        // `sampler`, the sampler ignores `imageView` / `imageLayout`.
         VkDescriptorImageInfo const base_color_image_info{
-            .sampler{base_color_sampler_handle},
+            .sampler{VK_NULL_HANDLE},
             .imageView{base_color_image_view_handle},
             .imageLayout{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}
         };
 
-        VkWriteDescriptorSet const bindless_sampler_write{
-            .sType{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
-            .pNext{nullptr},
-            .dstSet{bindless_descriptor_set_handle},
-            .dstBinding{0},
-            .dstArrayElement{0},
-            .descriptorCount{1},
-            .descriptorType{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER},
-            .pImageInfo{&base_color_image_info},
-            .pBufferInfo{nullptr},
-            .pTexelBufferView{nullptr}
+        VkDescriptorImageInfo const base_color_sampler_info{
+            .sampler{base_color_sampler_handle},
+            .imageView{VK_NULL_HANDLE},
+            .imageLayout{VK_IMAGE_LAYOUT_UNDEFINED}
         };
 
-        vkUpdateDescriptorSets(vk_context.device().handle(), 1, &bindless_sampler_write, 0, nullptr);
+        std::array const bindless_writes{
+            VkWriteDescriptorSet{
+                .sType{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
+                .pNext{nullptr},
+                .dstSet{bindless_descriptor_set_handle},
+                .dstBinding{0},
+                .dstArrayElement{0},
+                .descriptorCount{1},
+                .descriptorType{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE},
+                .pImageInfo{&base_color_image_info},
+                .pBufferInfo{nullptr},
+                .pTexelBufferView{nullptr}
+            },
+            VkWriteDescriptorSet{
+                .sType{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET},
+                .pNext{nullptr},
+                .dstSet{bindless_descriptor_set_handle},
+                .dstBinding{1},
+                .dstArrayElement{0},
+                .descriptorCount{1},
+                .descriptorType{VK_DESCRIPTOR_TYPE_SAMPLER},
+                .pImageInfo{&base_color_sampler_info},
+                .pBufferInfo{nullptr},
+                .pTexelBufferView{nullptr}
+            }
+        };
+
+        vkUpdateDescriptorSets(
+            vk_context.device().handle(),
+            static_cast<std::uint32_t>(bindless_writes.size()),
+            bindless_writes.data(),
+            0,
+            nullptr);
     }
 
     auto const pipeline_layout = vk_object_registry.create_pipeline_layout(
@@ -1102,12 +1152,6 @@ static bool run_app(
 
     vkgc::update_loop([&]
     {
-        // Begin render loop
-
-        VKGC_CHECKF(
-            frame_index >= vkgc::kFramesInFlight,
-            "frame index has to be greater or equal to frames-in-flight number");
-
         if (window.should_close())
         {
             return false;
@@ -1119,15 +1163,7 @@ static bool run_app(
             return true;
         }
 
-        if (presenter.consume_rebuild_request())
-        {
-            if (!rebuild_swapchain_resources())
-            {
-                return false;
-            }
-
-            return true;
-        }
+        // Frame update
 
         // Spin the mesh so all sides become visible over time.
         auto const time = static_cast<float>(glfwGetTime());
@@ -1156,8 +1192,25 @@ static bool run_app(
         per_frame_shader_data const shader_data{
             .mvp{proj * view * model},
             .normal{normal},
-            .texture_id{0}
+            .texture_id{0},
+            .sampler_id{0}
         };
+
+        // Begin render loop
+
+        VKGC_CHECKF(
+            frame_index >= vkgc::kFramesInFlight,
+            "frame index has to be greater or equal to frames-in-flight number");
+
+        if (presenter.consume_rebuild_request())
+        {
+            if (!rebuild_swapchain_resources())
+            {
+                return false;
+            }
+
+            return true;
+        }
 
         std::uint32_t const frame_slot_index = frame_ring.begin_frame(frame_index);
         if (!VKGC_ENSUREF(
@@ -1236,8 +1289,8 @@ static bool run_app(
             }
         }
 
-        auto const depth_attachment_image_handle = vk_object_registry.resolve_handle(depth_attachment_image);
-        if (!VKGC_ENSURE_VKHANDLE(depth_attachment_image_handle))
+        auto const depth_attachment = vk_object_registry.resolve_image(depth_attachment_image);
+        if (!VKGC_ENSURE_VKHANDLE(depth_attachment.image) || !VKGC_ENSURE_VKHANDLE(depth_attachment.view))
         {
             return false;
         }
@@ -1275,9 +1328,9 @@ static bool run_app(
                     .newLayout{VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL},
                     .srcQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
                     .dstQueueFamilyIndex{VK_QUEUE_FAMILY_IGNORED},
-                    .image{depth_attachment_image_handle},
+                    .image{depth_attachment.image},
                     .subresourceRange{
-                        .aspectMask{vkgc::format_to_image_aspect(depth_attachment_format)},
+                        .aspectMask{depth_attachment.desc.aspect},
                         .baseMipLevel{0},
                         .levelCount{1},
                         .baseArrayLayer{0},
@@ -1308,12 +1361,6 @@ static bool run_app(
             return false;
         }
 
-        auto const depth_attachment_image_view_handle = vk_object_registry.resolve_handle(depth_attachment_image_view);
-        if (!VKGC_ENSURE_VKHANDLE(depth_attachment_image_view_handle))
-        {
-            return false;
-        }
-
         VkRenderingAttachmentInfo const color_attachment_info{
             .sType{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
             .pNext{nullptr},
@@ -1330,7 +1377,7 @@ static bool run_app(
         VkRenderingAttachmentInfo const depth_attachment_info{
             .sType{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
             .pNext{nullptr},
-            .imageView{depth_attachment_image_view_handle},
+            .imageView{depth_attachment.view},
             .imageLayout{VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL},
             .resolveMode{VK_RESOLVE_MODE_NONE},
             .resolveImageView{VK_NULL_HANDLE},
@@ -1561,6 +1608,8 @@ static bool run_app(
 
         glfwPollEvents();
         return true;
+
+        // End frame update
     });
 
     if (pipeline_cache.is_valid())
