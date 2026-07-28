@@ -138,15 +138,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
         return false;
     }
 
-    vkgc::vk_image_handle depth_attachment_image;
-    vkgc::vk_image_view_handle depth_attachment_image_view;
-
-    if (!vkgc::create_depth_attachment(
+    auto depth_attachment_image = vkgc::create_depth_attachment(
         vk_object_registry,
         depth_attachment_format,
-        {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
-        depth_attachment_image,
-        depth_attachment_image_view))
+        {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}});
+    if (!depth_attachment_image.is_valid())
     {
         std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
         return false;
@@ -161,7 +157,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
         VKGC_VERIFY_VKSUCCESS(vkDeviceWaitIdle(vk_context.device().handle()));
 
-        vk_object_registry.destroy_immediate(depth_attachment_image_view);
+        // Destroying the image takes its default view with it.
         vk_object_registry.destroy_immediate(depth_attachment_image);
 
         for (auto const image_view_handle : swapchain_image_view_handles)
@@ -184,12 +180,11 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             return false;
         }
 
-        if (!vkgc::create_depth_attachment(
+        depth_attachment_image = vkgc::create_depth_attachment(
             vk_object_registry,
             depth_attachment_format,
-            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}},
-            depth_attachment_image,
-            depth_attachment_image_view))
+            {.width{presenter.surface_extent().width}, .height{presenter.surface_extent().height}, .depth{1}});
+        if (!depth_attachment_image.is_valid())
         {
             std::println(stderr, "[Vulkan] : Error : failed to create depth attachment");
             return false;
