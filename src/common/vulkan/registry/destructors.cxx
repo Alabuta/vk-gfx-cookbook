@@ -14,6 +14,11 @@ namespace vkgc
 {
     void vulkan_object_registry::destroy_payload(vk_object_payload<vk_image_handle> const& payload) noexcept
     {
+        if (payload.default_view.is_valid())
+        {
+            destroy_immediate(payload.default_view);
+        }
+
         vkDestroyImage(device_.handle(), payload.handle, nullptr);
         if (payload.allocation.is_valid())
         {

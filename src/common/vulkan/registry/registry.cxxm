@@ -28,6 +28,21 @@ export namespace vkgc
         char const* debug_name{""};
     };
 
+    // Flattened read-only snapshot of an image payload: what barrier recording and descriptor
+    // writes need, resolved in one lookup instead of one per field. Owns nothing.
+    struct gpu_image
+    {
+        VkImage image{VK_NULL_HANDLE};
+        VkImageView view{VK_NULL_HANDLE};
+
+        vk_allocation_handle allocation{};
+
+        image_desc desc{};
+
+        VkImageLayout steady_state_layout{VK_IMAGE_LAYOUT_UNDEFINED};
+        std::uint32_t bindless_slot{kInvalidBindlessSlot};
+    };
+
     class vulkan_object_registry final
     {
     public:
@@ -41,13 +56,19 @@ export namespace vkgc
         vulkan_object_registry& operator=(vulkan_object_registry const&) = delete;
         vulkan_object_registry& operator=(vulkan_object_registry&&) = delete;
 
+        // Creates the image and, unless `registration` opts out or the usage flags don't call for
+        // one, a full-resource default view owned by the same payload.
         [[nodiscard]]
-        vk_image_handle create_image(VkImageCreateInfo const& info, char const* debug_name = "");
+        vk_image_handle create_image(
+            VkImageCreateInfo const& info,
+            image_registration const& registration = {},
+            char const* debug_name = "");
 
         [[nodiscard]]
         vk_image_handle create_memory_bound_image(
             VkImageCreateInfo const& image_info,
             VmaAllocationCreateInfo const& allocation_info,
+            image_registration const& registration = {},
             char const* debug_name = "");
 
         [[nodiscard]]
@@ -170,11 +191,10 @@ export namespace vkgc
             return slot_map<Handle>().is_alive(handle);
         }
 
+        // Resolves a handle into everything the image carries, native view included.
+        // Returns a fully null gpu_image for a stale handle.
         [[nodiscard]]
-        VkFormat image_format(vk_image_handle handle) const noexcept;
-
-        [[nodiscard]]
-        VkExtent3D image_extent(vk_image_handle handle) const noexcept;
+        gpu_image resolve_image(vk_image_handle handle) const noexcept;
 
         [[nodiscard]]
         VkDeviceSize buffer_size(vk_buffer_handle handle) const noexcept;
@@ -215,6 +235,16 @@ export namespace vkgc
         vulkan_device const& device_;
         slot_map_tuple slot_maps_;
 
+        // Shared tail of create_image / create_memory_bound_image: derives the immutable
+        // description, eagerly creates the default view, and registers the finished payload.
+        [[nodiscard]]
+        vk_image_handle finalize_created_image(
+            VkImage image,
+            vk_allocation_handle allocation,
+            VkImageCreateInfo const& info,
+            image_registration const& registration,
+            char const* debug_name);
+
         template <typename T, typename S>
         auto slot_map(this S&& self) noexcept
             -> std::conditional_t<
@@ -236,13 +266,49 @@ export namespace vkgc
             return slot_map<Handle>().emplace(native_handle, std::forward<PayloadArgs>(payload_args)...);
         }
 
+        // finalize_created_object forwards payload fields positionally, which stops being safe once
+        // a payload holds several same-typed fields in a row. This overload takes the payload
+        // already built with designated initializers, so field order can't drift into a silent
+        // mismatch. Prefer it for any payload wider than a couple of fields.
+        template <typename Handle>
+        [[nodiscard]]
+        Handle finalize_created_payload(
+            VkObjectType const object_type,
+            char const* const debug_name,
+            vk_object_payload<Handle>&& payload)
+        {
+            device_.set_debug_object_name(
+                object_type,
+                std::bit_cast<std::uint64_t>(payload.handle),
+                debug_name);
+
+            return slot_map<Handle>().emplace(std::move(payload));
+        }
+
+        // Routed through destroy_immediate so teardown-by-drain and teardown-by-handle can't
+        // diverge: a payload that nests another object (an image owning its default view) frees
+        // that nested handle itself, and only a released slot makes the nested free idempotent.
+        // Destroying without releasing would double-free every nested object whose own pool
+        // drains first.
         template <typename Handle>
         void drain_pool_in_destructor()
         {
-            slot_map<Handle>().for_each_live([this](auto, vk_object_payload<Handle> const& payload)
+            auto& slots = slot_map<Handle>();
+
+            // Snapshot the live handles before touching anything: destroy_immediate releases as
+            // it goes, and a nested free can reach into this very pool.
+            std::vector<Handle> live_handles;
+            live_handles.reserve(slots.live_count());
+
+            slots.for_each_live([&live_handles](Handle const handle, vk_object_payload<Handle> const&)
             {
-                destroy_payload(payload);
+                live_handles.push_back(handle);
             });
+
+            for (auto const handle : live_handles)
+            {
+                destroy_immediate(handle);
+            }
         }
 
         /*

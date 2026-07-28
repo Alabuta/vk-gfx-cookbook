@@ -54,16 +54,22 @@ namespace vkgc
         drain_pool_in_destructor<vk_shader_handle>();
     }
 
-    VkFormat vulkan_object_registry::image_format(vk_image_handle handle) const noexcept
+    gpu_image vulkan_object_registry::resolve_image(vk_image_handle const handle) const noexcept
     {
         vk_object_payload<vk_image_handle> const* p = slot_map<vk_image_handle>().try_get(handle);
-        return p != nullptr ? p->format : VK_FORMAT_UNDEFINED;
-    }
+        if (p == nullptr)
+        {
+            return {};
+        }
 
-    VkExtent3D vulkan_object_registry::image_extent(vk_image_handle handle) const noexcept
-    {
-        vk_object_payload<vk_image_handle> const* p = slot_map<vk_image_handle>().try_get(handle);
-        return p != nullptr ? p->extent : VkExtent3D{};
+        return gpu_image{
+            .image{p->handle},
+            .view{resolve_handle(p->default_view)},
+            .allocation{p->allocation},
+            .desc{p->desc},
+            .steady_state_layout{p->steady_state_layout},
+            .bindless_slot{p->bindless_slot}
+        };
     }
 
     VkDeviceSize vulkan_object_registry::buffer_size(vk_buffer_handle handle) const noexcept

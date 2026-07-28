@@ -65,12 +65,10 @@ namespace vkgc
         return image_view_handles;
     }
 
-    bool create_depth_attachment(
+    vk_image_handle create_depth_attachment(
         vulkan_object_registry& vk_object_registry,
         VkFormat const image_format,
-        VkExtent3D const image_extent,
-        vk_image_handle& image,
-        vk_image_view_handle& image_view)
+        VkExtent3D const image_extent)
     {
         VkImageCreateInfo const image_create_info{
             .sType{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO},
@@ -101,53 +99,27 @@ namespace vkgc
             .priority{0}
         };
 
-        image = vk_object_registry.create_memory_bound_image(
-            image_create_info,
-            allocation_create_info,
-            "depth attachment image");
-        if (!image.is_valid())
-        {
-            return false;
-        }
-
-        VkImageViewCreateInfo const depth_view_create_info{
-            .sType{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO},
-            .pNext{nullptr},
-            .flags{0},
-            .image{vk_object_registry.resolve_handle(image)},
-            .viewType{VK_IMAGE_VIEW_TYPE_2D},
-            .format{image_format},
-            .components{
-                .r{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .g{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .b{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .a{VK_COMPONENT_SWIZZLE_IDENTITY}
-            },
-            .subresourceRange{
-                .aspectMask{format_to_image_aspect(image_format)},
-                .baseMipLevel{0},
-                .levelCount{1},
-                .baseArrayLayer{0},
-                .layerCount{1}
-            }
+        // view_aspect stays zero, so the default view keeps the full DEPTH|STENCIL aspect the
+        // packed depth-stencil formats report. That is what a depth attachment wants; sampling
+        // such an image needs a separate single-aspect view.
+        image_registration constexpr registration{
+            .bindless_slot{kInvalidBindlessSlot},
+            .steady_state_layout{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL},
+            .view_aspect{VK_IMAGE_ASPECT_NONE},
+            .create_default_view{true}
         };
 
-        image_view = vk_object_registry.create_image_view(depth_view_create_info, "depth attachment image view");
-        if (!image_view.is_valid())
-        {
-            vk_object_registry.destroy_immediate(image);
-            return false;
-        }
-
-        return true;
+        return vk_object_registry.create_memory_bound_image(
+            image_create_info,
+            allocation_create_info,
+            registration,
+            "depth attachment image");
     }
 
-    bool create_sampled_texture(
+    vk_image_handle create_sampled_texture(
         vulkan_object_registry& vk_object_registry,
         VkFormat const image_format,
-        VkExtent3D const image_extent,
-        vk_image_handle& image,
-        vk_image_view_handle& image_view)
+        VkExtent3D const image_extent)
     {
         VkImageCreateInfo const image_create_info{
             .sType{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO},
@@ -178,63 +150,20 @@ namespace vkgc
             .priority{0}
         };
 
-        image = vk_object_registry.create_memory_bound_image(
-            image_create_info,
-            allocation_create_info,
-            "sampled texture image");
-        if (!image.is_valid())
-        {
-            return false;
-        }
-
-        VkImageViewCreateInfo const texture_view_create_info{
-            .sType{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO},
-            .pNext{nullptr},
-            .flags{0},
-            .image{vk_object_registry.resolve_handle(image)},
-            .viewType{VK_IMAGE_VIEW_TYPE_2D},
-            .format{image_format},
-            .components{
-                .r{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .g{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .b{VK_COMPONENT_SWIZZLE_IDENTITY},
-                .a{VK_COMPONENT_SWIZZLE_IDENTITY}
-            },
-            .subresourceRange{
-                .aspectMask{format_to_image_aspect(image_format)},
-                .baseMipLevel{0},
-                .levelCount{1},
-                .baseArrayLayer{0},
-                .layerCount{1}
-            }
+        // The texture is uploaded through a transfer and then read by shaders, so it rests in
+        // SHADER_READ_ONLY_OPTIMAL — which is also the layout a descriptor write must declare.
+        image_registration constexpr registration{
+            .bindless_slot{kInvalidBindlessSlot},
+            .steady_state_layout{VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+            .view_aspect{VK_IMAGE_ASPECT_NONE},
+            .create_default_view{true}
         };
 
-        image_view = vk_object_registry.create_image_view(texture_view_create_info, "sampled texture image view");
-        if (!image_view.is_valid())
-        {
-            vk_object_registry.destroy_immediate(image);
-            return false;
-        }
-
-        return true;
+        return vk_object_registry.create_memory_bound_image(
+            image_create_info,
+            allocation_create_info,
+            registration,
+            "sampled texture image");
     }
 
-    VkImageAspectFlags format_to_image_aspect(VkFormat format)
-    {
-        switch (format)
-        {
-        case VK_FORMAT_D16_UNORM:
-        case VK_FORMAT_X8_D24_UNORM_PACK32:
-        case VK_FORMAT_D32_SFLOAT:
-            return VK_IMAGE_ASPECT_DEPTH_BIT;
-        case VK_FORMAT_S8_UINT:
-            return VK_IMAGE_ASPECT_STENCIL_BIT;
-        case VK_FORMAT_D16_UNORM_S8_UINT:
-        case VK_FORMAT_D24_UNORM_S8_UINT:
-        case VK_FORMAT_D32_SFLOAT_S8_UINT:
-            return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-        default:
-            return VK_IMAGE_ASPECT_COLOR_BIT;
-        }
-    }
 }

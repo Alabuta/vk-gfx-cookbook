@@ -30,27 +30,23 @@ export namespace vkgc
         std::span<VkImage const> images,
         VkFormat format);
 
-    // Creates a dedicated device-local depth attachment (image + matching depth-aspect
-    // view) of the given format and extent. On success writes both handles and returns
-    // true; on failure destroys anything already created and returns false.
+    // Creates a dedicated device-local depth attachment of the given format and extent. The
+    // matching view comes along as the image's default view; reach it through
+    // vulkan_object_registry::resolve_image. Returns an invalid handle on failure.
     [[nodiscard]]
-    bool create_depth_attachment(
+    vk_image_handle create_depth_attachment(
         vulkan_object_registry& vk_object_registry,
         VkFormat image_format,
-        VkExtent3D image_extent,
-        vk_image_handle& image,
-        vk_image_view_handle& image_view);
+        VkExtent3D image_extent);
 
-    // Creates a device-local 2D texture (image + color-aspect view) the GPU can
-    // sample from and a transfer can write into. On success writes both handles
-    // and returns true; on failure destroys anything already created and returns false.
+    // Creates a device-local 2D texture the GPU can sample from and a transfer can write into.
+    // As with the depth attachment, the sampling view is the image's default view. Returns an
+    // invalid handle on failure.
     [[nodiscard]]
-    bool create_sampled_texture(
+    vk_image_handle create_sampled_texture(
         vulkan_object_registry& vk_object_registry,
         VkFormat image_format,
-        VkExtent3D image_extent,
-        vk_image_handle& image,
-        vk_image_view_handle& image_view);
+        VkExtent3D image_extent);
 
     [[nodiscard]]
     vk_buffer_handle create_host_writable_buffer(
@@ -135,7 +131,4 @@ export namespace vkgc
         vulkan_context const& vk_context,
         vulkan_object_registry const& vk_object_registry,
         vk_allocation_handle allocation);
-
-    [[nodiscard]]
-    VkImageAspectFlags format_to_image_aspect(VkFormat format);
 }

@@ -12,6 +12,62 @@ import vkgc.vulkan_handle;
 
 export namespace vkgc
 {
+    std::uint32_t constexpr kInvalidBindlessSlot{std::numeric_limits<std::uint32_t>::max()};
+
+    [[nodiscard]]
+    constexpr VkImageAspectFlags format_to_image_aspect(VkFormat format)
+    {
+        switch (format)
+        {
+        case VK_FORMAT_D16_UNORM:
+            [[fallthrough]];
+        case VK_FORMAT_X8_D24_UNORM_PACK32:
+            [[fallthrough]];
+        case VK_FORMAT_D32_SFLOAT:
+            return VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        case VK_FORMAT_S8_UINT:
+            return VK_IMAGE_ASPECT_STENCIL_BIT;
+
+        case VK_FORMAT_D16_UNORM_S8_UINT:
+            [[fallthrough]];
+        case VK_FORMAT_D24_UNORM_S8_UINT:
+            [[fallthrough]];
+        case VK_FORMAT_D32_SFLOAT_S8_UINT:
+            return VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
+
+        default:
+            return VK_IMAGE_ASPECT_COLOR_BIT;
+        }
+    }
+
+    // Creation-time knobs that have no home in VkImageCreateInfo. The defaults reproduce the
+    // behaviour call sites had before the image payload grew a view and a bindless slot.
+    struct image_registration
+    {
+        std::uint32_t bindless_slot{kInvalidBindlessSlot};
+        VkImageLayout steady_state_layout{VK_IMAGE_LAYOUT_UNDEFINED};
+        // Set explicitly to sample a depth-only view of a packed depth-stencil image:
+        // a two-aspect view is legal as an attachment but not as a sampled descriptor.
+        VkImageAspectFlags view_aspect{VK_IMAGE_ASPECT_NONE};
+        bool create_default_view{true};
+    };
+
+    // Everything vkCreateImage was told, kept so call sites never re-derive it or thread it
+    // alongside the handle. Immutable for the lifetime of the image.
+    struct image_desc
+    {
+        VkFormat format{VK_FORMAT_UNDEFINED};
+        VkExtent3D extent{};
+        std::uint32_t mip_levels{1};
+        std::uint32_t array_layers{1};
+        VkImageType type{VK_IMAGE_TYPE_2D};
+        VkSampleCountFlagBits samples{VK_SAMPLE_COUNT_1_BIT};
+        VkImageUsageFlags usage{0};
+        VkImageCreateFlags flags{0};
+        VkImageAspectFlags aspect{VK_IMAGE_ASPECT_COLOR_BIT};
+    };
+
     template <typename Handle>
     struct vk_object_payload;
 
@@ -20,24 +76,23 @@ export namespace vkgc
     {
         VkImage handle{VK_NULL_HANDLE};
 
-        VkFormat format{VK_FORMAT_UNDEFINED};
-        VkExtent3D extent{};
-        std::uint32_t mip_levels{1};
-        std::uint32_t array_layers{1};
+        image_desc desc{};
 
         vk_allocation_handle allocation{};
 
-        // :TODO: add default VkImageView, default bindless slot index and immutable desc
+        // Full-resource view created eagerly alongside the image; destroyed with it. Stays
+        // invalid for images whose usage never needs one (transfer-only, staging).
+        vk_image_view_handle default_view{};
 
-        // :TODO: add eager primary view (full resource access)
-        // VkImageView default{VK_NULL_HANDLE};
-        // uint32_t bindless_slot{0};
+        // Layout the resource rests in between passes, i.e. what a descriptor write for
+        // default_view declares. Immutable — not a layout tracker.
+        VkImageLayout steady_state_layout{VK_IMAGE_LAYOUT_UNDEFINED};
 
-        // :TODO: add subresource views (lazy cache)
-        // :TODO: add pre-allocated fast views (e.g., per-mip storage views for compute)
+        // Index into the renderer's bindless sampled-image table, or kInvalidBindlessSlot.
+        std::uint32_t bindless_slot{kInvalidBindlessSlot};
 
-        // :TODO: add layout & synchronization tracking
-        // VkImageLayout current_layout;
+        // No subresource-view cache here: VkSlotMapPayload rules out owning containers in a
+        // payload. Per-mip storage views belong in a side table keyed by the image handle.
     };
 
     template <>
