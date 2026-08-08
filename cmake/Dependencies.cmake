@@ -44,20 +44,27 @@ mark_as_advanced(VKGC_SLANG_INCLUDE_DIR VKGC_SLANG_LIBRARY_RELEASE VKGC_SLANG_LI
 # UNKNOWN IMPORTED keeps this cross-platform: on Windows the located file is slang's import .lib (the matching
 # slang.dll resolves at runtime via the SDK's Bin dir on PATH); on Linux/macOS it's the shared object itself.
 add_library(Slang::Slang UNKNOWN IMPORTED)
-# IMPORTED_LOCATION is the all-config fallback (used when no IMPORTED_LOCATION_<CONFIG> matches); the
-# maps funnel the non-Release build types onto the release artifact. When slangd is present we add the
-# per-config locations and re-point DEBUG at the debug build; otherwise everything stays on release.
+# IMPORTED_LOCATION is the all-config fallback; the maps funnel the non-Release build types onto the
+# release artifact. The RELEASE configuration has to be declared unconditionally: once a non-empty
+# MAP_IMPORTED_CONFIG_<CONFIG> exists, CMake commits to the mapping and will NOT fall back to the plain
+# IMPORTED_LOCATION, so a map pointing at an undeclared configuration fails the generate step with
+# "IMPORTED_LOCATION not set for imported target" once per consumer. The macOS SDK ships only
+# libslang.dylib (no libslangd), which is exactly the case that leaves DEBUG mapped onto a Release
+# configuration that the slangd-guarded block below would otherwise never have created.
 set_target_properties(Slang::Slang PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${VKGC_SLANG_INCLUDE_DIR}"
         IMPORTED_LOCATION "${VKGC_SLANG_LIBRARY_RELEASE}"
+        IMPORTED_CONFIGURATIONS "RELEASE"
+        IMPORTED_LOCATION_RELEASE "${VKGC_SLANG_LIBRARY_RELEASE}"
         MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
         MAP_IMPORTED_CONFIG_MINSIZEREL Release
         MAP_IMPORTED_CONFIG_DEBUG Release
 )
+# When the SDK carries the asserts-enabled build (Windows), add the DEBUG configuration and re-point
+# the Debug map at it; otherwise every build type stays on the release artifact mapped above.
 if (VKGC_SLANG_LIBRARY_DEBUG)
     set_target_properties(Slang::Slang PROPERTIES
             IMPORTED_CONFIGURATIONS "RELEASE;DEBUG"
-            IMPORTED_LOCATION_RELEASE "${VKGC_SLANG_LIBRARY_RELEASE}"
             IMPORTED_LOCATION_DEBUG "${VKGC_SLANG_LIBRARY_DEBUG}"
             MAP_IMPORTED_CONFIG_DEBUG Debug
     )
