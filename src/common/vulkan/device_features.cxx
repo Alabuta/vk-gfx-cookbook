@@ -17,20 +17,20 @@ namespace
 {
     std::array constexpr kRequiredVk10Features{
         &VkPhysicalDeviceFeatures::imageCubeArray,
-        &VkPhysicalDeviceFeatures::geometryShader,
+        // &VkPhysicalDeviceFeatures::geometryShader,
         &VkPhysicalDeviceFeatures::tessellationShader,
         &VkPhysicalDeviceFeatures::sampleRateShading,
         &VkPhysicalDeviceFeatures::multiDrawIndirect,
         &VkPhysicalDeviceFeatures::drawIndirectFirstInstance,
         &VkPhysicalDeviceFeatures::depthClamp,
-        &VkPhysicalDeviceFeatures::fillModeNonSolid,
+        // &VkPhysicalDeviceFeatures::fillModeNonSolid
         &VkPhysicalDeviceFeatures::samplerAnisotropy,
         &VkPhysicalDeviceFeatures::shaderUniformBufferArrayDynamicIndexing,
         &VkPhysicalDeviceFeatures::shaderSampledImageArrayDynamicIndexing,
         &VkPhysicalDeviceFeatures::shaderStorageBufferArrayDynamicIndexing,
         &VkPhysicalDeviceFeatures::shaderStorageImageArrayDynamicIndexing,
         &VkPhysicalDeviceFeatures::shaderInt16,
-        &VkPhysicalDeviceFeatures::sparseBinding
+        // &VkPhysicalDeviceFeatures::sparseBinding
     };
 
     // None required today
