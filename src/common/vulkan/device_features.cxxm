@@ -1,5 +1,6 @@
 module;
 
+#include <span>
 #include <volk.h>
 
 export module vkgc.vulkan_device_features;
@@ -8,6 +9,9 @@ import vkgc.vulkan_helpers;
 
 export namespace vkgc
 {
+    // Core feature structs first, then one struct per requested extension. Every struct always
+    // rides in the pNext chain; a requested struct's features are raised only when its extension
+    // is being enabled on the device and stay VK_FALSE otherwise.
     using vulkan_device_features_chain = vulkan_extending_structs_chain<
         VkPhysicalDeviceFeatures2,
         VkPhysicalDeviceVulkan11Features,
@@ -21,6 +25,10 @@ export namespace vkgc
         VkPhysicalDevice physical_device,
         VkPhysicalDeviceProperties2 const& device_properties);
 
+    // Required features are always enabled. Requested (extension) features are enabled only for
+    // the extensions in `supported_requested_extensions`, which must be exactly the requested
+    // extensions that end up in ppEnabledExtensionNames.
     [[nodiscard]]
-    vulkan_device_features_chain build_device_features_chain();
+    vulkan_device_features_chain build_device_features_chain(
+        std::span<char const* const> supported_requested_extensions);
 }

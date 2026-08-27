@@ -2,7 +2,10 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstring>
 #include <print>
+#include <span>
 
 #include <volk.h>
 
@@ -64,7 +67,7 @@ namespace
         &VkPhysicalDeviceVulkan14Features::maintenance5
     };
 
-    std::array constexpr kRequiredShaderObjectFeature{
+    std::array constexpr kRequestedShaderObjectFeatures{
         &VkPhysicalDeviceShaderObjectFeaturesEXT::shaderObject
     };
 
@@ -73,7 +76,8 @@ namespace
     {
         static_assert(
             VK_HEADER_VERSION_COMPLETE < VK_MAKE_API_VERSION(0, 1, 5, 0),
-            "Vulkan 1.5 headers available - extend make_features_chain and visit_required_feature_sets");
+            "Vulkan 1.5 headers available - extend make_features_chain and visit_required_feature_sets, "
+            "and re-index visit_requested_feature_sets");
 
 #if defined(__GNUC__) || defined(__GNUG__)
 #pragma GCC diagnostic push
@@ -97,14 +101,26 @@ namespace
     template <class C, class V>
     void visit_required_feature_sets(C& features_chain, V&& visit)
     {
-        static_assert(C::Size == 6, "Chain shape changed - update visit_required_feature_sets");
+        static_assert(C::Size >= 5, "Chain shape changed - update visit_required_feature_sets");
 
         visit(features_chain.template get<0>().features, kRequiredVk10Features, "VkPhysicalDeviceFeatures");
         visit(features_chain.template get<1>(), kRequiredVk11Features, "VkPhysicalDeviceVulkan11Features");
         visit(features_chain.template get<2>(), kRequiredVk12Features, "VkPhysicalDeviceVulkan12Features");
         visit(features_chain.template get<3>(), kRequiredVk13Features, "VkPhysicalDeviceVulkan13Features");
         visit(features_chain.template get<4>(), kRequiredVk14Features, "VkPhysicalDeviceVulkan14Features");
-        visit(features_chain.template get<5>(), kRequiredShaderObjectFeature, "VkPhysicalDeviceShaderObjectFeaturesEXT");
+    }
+
+    // One visit per requested extension: its feature struct, the features we need from it, and the
+    // extension that owns them.
+    template <class C, class V>
+    void visit_requested_feature_sets(C& features_chain, V&& visit)
+    {
+        static_assert(C::Size == 6, "Chain shape changed - update visit_requested_feature_sets");
+
+        visit(
+            features_chain.template get<5>(),
+            kRequestedShaderObjectFeatures,
+            VK_EXT_SHADER_OBJECT_EXTENSION_NAME);
     }
 }
 
@@ -146,7 +162,8 @@ namespace vkgc
         return all_supported;
     }
 
-    vulkan_device_features_chain build_device_features_chain()
+    vulkan_device_features_chain build_device_features_chain(
+        std::span<char const* const> const supported_requested_extensions)
     {
         auto features_chain = make_features_chain();
 
@@ -155,6 +172,26 @@ namespace vkgc
             [](auto& features, auto const& required, char const*)
             {
                 for (auto m : required)
+                {
+                    features.*m = VK_TRUE;
+                }
+            });
+
+        // Requested features are raised only when their extension is being enabled on the device;
+        // otherwise the struct stays in the chain with every feature left VK_FALSE.
+        visit_requested_feature_sets(
+            features_chain,
+            [&](auto& features, auto const& requested, char const* ext_name)
+            {
+                bool const enabled = std::ranges::any_of(
+                    supported_requested_extensions,
+                    [ext_name](char const* ext) { return std::strcmp(ext, ext_name) == 0; });
+                if (!enabled)
+                {
+                    return;
+                }
+
+                for (auto m : requested)
                 {
                     features.*m = VK_TRUE;
                 }

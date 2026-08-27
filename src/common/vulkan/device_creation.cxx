@@ -3,11 +3,15 @@ module;
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <print>
 #include <ranges>
+#include <span>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <volk.h>
@@ -25,8 +29,11 @@ import vkgc.vulkan_device_features;
 
 namespace
 {
-    std::array constexpr kVulkanDeviceDefaultExtensions{
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    std::array<char const*, 1> constexpr kVulkanDeviceRequiredExtensions{
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+
+    std::array<char const*, 1> constexpr kVulkanDeviceRequestedExtensions{
         VK_EXT_SHADER_OBJECT_EXTENSION_NAME
     };
 
@@ -77,13 +84,58 @@ namespace
         }
 
         std::string_view constexpr prefix{"[Vulkan] : Warning :"};
-        std::println(stderr, "{} next device extensions are unsupported:", prefix);
-        for (auto&& extension : unsupported_extensions)
+        std::println(stdout, "{} next device extensions are unsupported:", prefix);
+        for (char const* extension : unsupported_extensions)
         {
-            std::println(stderr, "{:{}} {}", "", prefix.size(), extension);
+            std::println(stdout, "{:{}} {}", "", prefix.size(), extension);
         }
 
         return false;
+    }
+
+    // The subset of `candidates` the device advertises. Optional extensions go through here
+    // instead of check_device_extensions_support: a missing one is not a failure, it just
+    // does not get enabled. Returned pointers alias `candidates`.
+    [[nodiscard]]
+    std::vector<char const*> filter_supported_extensions(
+        VkPhysicalDevice physical_device,
+        std::span<char const* const> const candidates)
+    {
+        std::uint32_t extensions_count{0};
+        if (!VKGC_ENSURE_VKSUCCESS(vkEnumerateDeviceExtensionProperties(
+                physical_device,
+                nullptr,
+                &extensions_count,
+                nullptr)))
+        {
+            return {};
+        }
+
+        std::vector<VkExtensionProperties> supported_extensions(extensions_count);
+        if (!VKGC_ENSURE_VKSUCCESS(vkEnumerateDeviceExtensionProperties(
+                physical_device,
+                nullptr,
+                &extensions_count,
+                supported_extensions.data())))
+        {
+            return {};
+        }
+
+        std::vector<char const*> supported;
+        supported.reserve(candidates.size());
+
+        std::ranges::copy_if(
+            candidates,
+            std::back_inserter(supported),
+            [&supported_extensions](char const* candidate)
+            {
+                return std::ranges::any_of(
+                    supported_extensions,
+                    [candidate](char const* name) { return std::strcmp(name, candidate) == 0; },
+                    &VkExtensionProperties::extensionName);
+            });
+
+        return supported;
     }
 
     [[nodiscard]]
@@ -184,12 +236,20 @@ namespace
 
     [[nodiscard]]
     std::uint32_t score_physical_device(
+        VkPhysicalDevice physical_device,
         VkPhysicalDeviceProperties const& properties,
-        vkgc::vulkan_queue_families const& queue_families) noexcept
+        vkgc::vulkan_queue_families const& queue_families,
+        std::vector<char const*> device_extensions
+    ) noexcept
     {
         auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
 
         std::uint32_t score{0};
+
+        if (check_device_extensions_support(physical_device, std::move(device_extensions)))
+        {
+            score += 500;
+        }
 
         switch (properties.deviceType)
         {
@@ -216,28 +276,48 @@ namespace
         return score;
     }
 
-    // Returned pointers alias `requested`; do not mutate `requested` before vkCreateDevice.
     [[nodiscard]]
-    std::vector<char const*> build_device_extensions(std::vector<std::string> const& requested)
+    char const* extension_name(std::string const& ext) noexcept
+    {
+        return ext.c_str();
+    }
+
+    [[nodiscard]]
+    char const* extension_name(char const* ext) noexcept
+    {
+        return ext;
+    }
+
+    template <typename Range>
+    concept extension_name_range =
+        std::ranges::input_range<Range> &&
+        std::ranges::sized_range<Range> &&
+        requires(std::ranges::range_reference_t<Range> element) {
+            { extension_name(element) } -> std::same_as<char const*>;
+        };
+
+    // Returned pointers alias the input ranges; do not mutate them before vkCreateDevice.
+    template <extension_name_range... Exts>
+    [[nodiscard]]
+    std::vector<char const*> build_device_extensions(Exts&&... exts)
     {
         std::vector<char const*> extensions;
-        extensions.reserve(requested.size() + kVulkanDeviceDefaultExtensions.size());
+        extensions.reserve((std::ranges::size(exts) + ...));
 
-        std::ranges::copy_if(
-            requested | std::views::transform(&std::string::c_str),
-            std::back_inserter(extensions),
-            [&extensions](char const* ext)
-            {
-                return !std::ranges::any_of(extensions, [ext](char const* e) { return std::strcmp(e, ext) == 0; });
-            });
+        auto const append = [&extensions](auto&& ext_range)
+        {
+            std::ranges::copy_if(
+                ext_range | std::views::transform([](auto&& ext) { return extension_name(ext); }),
+                std::back_inserter(extensions),
+                [&extensions](char const* ext)
+                {
+                    return !std::ranges::any_of(
+                        extensions,
+                        [ext](char const* e) { return std::strcmp(e, ext) == 0; });
+                });
+        };
 
-        std::ranges::copy_if(
-            kVulkanDeviceDefaultExtensions,
-            std::back_inserter(extensions),
-            [&extensions](char const* ext)
-            {
-                return !std::ranges::any_of(extensions, [ext](char const* e) { return std::strcmp(e, ext) == 0; });
-            });
+        (append(std::forward<Exts>(exts)), ...);
 
         return extensions;
     }
@@ -246,6 +326,7 @@ namespace
     std::pair<VkPhysicalDevice, vkgc::vulkan_queue_families> select_physical_device(
         VkInstance instance,
         std::span<char const* const> const required_extensions,
+        std::span<char const* const> const requested_extensions,
         bool const presentation_required) noexcept
     {
         auto constexpr invalid_family_index = std::numeric_limits<std::uint32_t>::max();
@@ -271,7 +352,8 @@ namespace
         vkgc::vulkan_queue_families best_queue_families{};
         std::uint32_t best_score{0};
 
-        std::vector extensions_to_check{std::from_range, required_extensions};
+        std::vector required_extensions_to_check{std::from_range, required_extensions};
+        std::vector requested_extensions_to_check{std::from_range, requested_extensions};
 
         for (VkPhysicalDevice physical_device : physical_devices)
         {
@@ -287,7 +369,7 @@ namespace
                 continue;
             }
 
-            if (!check_device_extensions_support(physical_device, extensions_to_check))
+            if (!check_device_extensions_support(physical_device, required_extensions_to_check))
             {
                 continue;
             }
@@ -303,7 +385,11 @@ namespace
                 continue;
             }
 
-            if (auto const score = score_physical_device(device_properties.properties, queue_families);
+            if (auto const score = score_physical_device(
+                    physical_device,
+                    device_properties.properties,
+                    queue_families,
+                    requested_extensions_to_check);
                 best_device == VK_NULL_HANDLE || score > best_score)
             {
                 best_device = physical_device;
@@ -363,21 +449,31 @@ namespace vkgc
             return {};
         }
 
-        auto const extensions = build_device_extensions(info.extensions);
+        auto const required_extensions = build_device_extensions(
+            info.extensions, kVulkanDeviceRequiredExtensions);
+        auto const requested_extensions = build_device_extensions(kVulkanDeviceRequestedExtensions);
 
         auto [physical_device, queue_families] = select_physical_device(
             handle_,
-            extensions,
+            required_extensions,
+            requested_extensions,
             info.presentation_required);
         if (!VKGC_ENSUREF_VKHANDLE(physical_device, "failed to pick physical device"))
         {
             return {};
         }
 
+        // Requested extensions never gate selection (they only score devices), so the winner may
+        // support all, some, or none of them. Enable exactly the ones it advertises.
+        auto const supported_requested_extensions = filter_supported_extensions(
+            physical_device, requested_extensions);
+        auto const enabled_extensions = build_device_extensions(
+            required_extensions, supported_requested_extensions);
+
         auto const queue_create_infos = build_queue_create_infos(queue_families);
         assert(!queue_create_infos.empty());
 
-        auto const device_features_chain = build_device_features_chain();
+        auto const device_features_chain = build_device_features_chain(supported_requested_extensions);
 
         VkDeviceCreateInfo const create_info{
             .sType{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO},
@@ -387,8 +483,8 @@ namespace vkgc
             .pQueueCreateInfos{queue_create_infos.data()},
             .enabledLayerCount{0},
             .ppEnabledLayerNames{nullptr},
-            .enabledExtensionCount{static_cast<std::uint32_t>(extensions.size())},
-            .ppEnabledExtensionNames{extensions.data()},
+            .enabledExtensionCount{static_cast<std::uint32_t>(enabled_extensions.size())},
+            .ppEnabledExtensionNames{enabled_extensions.data()},
             .pEnabledFeatures{nullptr}
         };
 
