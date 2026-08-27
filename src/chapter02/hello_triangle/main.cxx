@@ -733,7 +733,7 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
             .resolveImageLayout{VK_IMAGE_LAYOUT_UNDEFINED},
             .loadOp{VK_ATTACHMENT_LOAD_OP_CLEAR},
             .storeOp{VK_ATTACHMENT_STORE_OP_STORE},
-            .clearValue{.color{.64f, .64f, .64f, 1.f}}
+            .clearValue{.color{.float32{.64f, .64f, .64f, 1.f}}}
         };
 
         VkRenderingAttachmentInfo const depth_attachment_info{
