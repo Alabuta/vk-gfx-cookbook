@@ -158,8 +158,12 @@ target_compile_options(vkgc_warnings
 
 # === vkgc::hardening ===
 # Link-time hardening: detect underlinking, disable lazy binding, enforce read-only-after-relocation.
-# ELF-only — PE/COFF (Windows) already resolves every import against an import library at link time,
+# ELF-only. PE/COFF (Windows) already resolves every import against an import library at link time,
 # so MinGW/Clang-MSYS need nothing here, and MSVC link.exe wouldn't accept these spellings anyway.
+# Mach-O (macOS) ships the equivalents by default: two-level-namespace links are `-undefined error`
+# (underlinking fails the link), chained fixups (macOS 12+ deployment targets) have dyld bind every
+# symbol at load with no lazy-binding stubs — which is why Xcode 15+ ld warns that `-bind_at_load`
+# is deprecated — and dyld remaps `__DATA_CONST` read-only once fixups are applied (RELRO's analog).
 
 add_library(vkgc_hardening INTERFACE)
 add_library(vkgc::hardening ALIAS vkgc_hardening)
@@ -170,10 +174,6 @@ target_link_options(vkgc_hardening
             LINKER:-z,defs                          # Detect and reject underlinking (== --no-undefined)
             LINKER:-z,now                           # Disable lazy binding
             LINKER:-z,relro                         # Read-only segments after relocation
-        ">"
-
-        "$<$<PLATFORM_ID:Darwin>:"
-            LINKER:-bind_at_load                    # Disable lazy binding
         ">"
 )
 
