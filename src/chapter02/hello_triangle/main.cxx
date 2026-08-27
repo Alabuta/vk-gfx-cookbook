@@ -541,6 +541,8 @@ static bool run_app(std::uint32_t width, std::uint32_t height)
 
     vkgc::update_loop([&]
     {
+        glfwWaitEvents();
+
         // Begin render loop
 
         VKGC_CHECKF(

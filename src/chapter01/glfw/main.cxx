@@ -1,3 +1,5 @@
+#include "GLFW/glfw3.h"
+
 import vkgc.bootstrap;
 import vkgc.window;
 
@@ -14,6 +16,8 @@ int main()
 
         while (!window.should_close())
         {
+            glfwWaitEvents();
+
             vkgc::update_loop(nullptr);
         }
     }
